@@ -54,15 +54,28 @@ impl QueryRoot {
         }
     }
 
+    async fn projects(&self, ctx: &Context<'_>) -> Vec<Entity> {
+        let state = ctx.data::<ApiState>().expect("ApiState not found");
+        match state.cloud.get_all("Project") {
+            Ok(rows) => rows.into_iter().map(|(id, name)| Entity { id, name }).collect(),
+            Err(e) => {
+                error!("Failed to fetch projects: {}", e);
+                vec![]
+            }
+        }
+    }
+
     async fn ask_oracle(&self, ctx: &Context<'_>, question: String) -> String {
         let state = ctx.data::<ApiState>().expect("ApiState not found");
         
         // Gather Context
         let clients = state.cloud.get_all("Client").unwrap_or_default();
         let operators = state.cloud.get_all("Operator").unwrap_or_default();
+        let projects = state.cloud.get_all("Project").unwrap_or_default();
         
         let context_str = format!(
-            "Known Clients: {:?}\nKnown Operators: {:?}", 
+            "Known Projects: {:?}\nKnown Clients: {:?}\nKnown Operators: {:?}", 
+            projects.iter().map(|(_, name)| name).collect::<Vec<_>>(),
             clients.iter().map(|(_, name)| name).collect::<Vec<_>>(),
             operators.iter().map(|(_, name)| name).collect::<Vec<_>>()
         );
@@ -79,12 +92,15 @@ impl QueryRoot {
         );
 
         let prompt = format!(
-            "System: You are the Strata Oracle, an AI managing a business database.\nContext: {}\nUser Question: {}",
+            "System: You are the Strata Oracle, an AI managing a business database.\nContext: {}
+User Question: {}",
             context_str, question
         );
 
         let body = serde_json::json!({
-            "contents": [{"parts": [{"text": prompt}]}]
+            "contents": [{
+                "parts": [{"text": prompt}]
+            }]
         });
 
         match client.post(&url).json(&body).send().await {

@@ -49,23 +49,44 @@ impl EventProcessor {
         let content = fs::read_to_string(path)?;
         let yaml: Value = serde_yaml::from_str(&content)?;
 
-        // HARDCODED LOGIC FOR PROTOTYPE (In real version, this comes from Config.relations)
-        // We look for 'client' and 'operator' fields.
+        // Extract Project Name (default to folder name if missing)
+        let project_name = yaml.get("name")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| {
+                path.parent()
+                    .and_then(|p| p.file_name())
+                    .map(|os| os.to_string_lossy().to_string())
+                    .unwrap_or("Unknown Project".to_string())
+            });
+
+        let status = yaml.get("status").and_then(|v| v.as_str()).unwrap_or("Active");
         
-        if let Some(client_val) = yaml.get("client") {
-            if let Some(client_name) = client_val.as_str() {
-                // Upsert Client
-                let id = self.cloud.upsert_entity("Client", "name", client_name)?;
-                info!("Linked Project to Client: {} (UUID: {})", client_name, id);
-            }
+        let client_name = yaml.get("client").and_then(|v| v.as_str()).unwrap_or("Unknown");
+        let op_name = yaml.get("operator").and_then(|v| v.as_str()).unwrap_or("Unknown");
+
+        // 1. Upsert Project into Cloud
+        // Note: In a real system, we'd handle the schema dynamically. 
+        // Here we rely on the implicit columns we created via strata.config
+        // We need to implement a generic upsert_row, but upsert_entity only does id/name.
+        // For the prototype, we will just use upsert_entity for the Project Name to get an ID.
+        // But wait, Project has extra fields (client, operator, status).
+        // Our current SqliteManager.upsert_entity is too simple (only id, name).
+        
+        // Let's stick to the prototype limitation: Just tracking existence.
+        // We will upsert the Project Name into the 'Project' table.
+        let project_id = self.cloud.upsert_entity("Project", "name", &project_name)?;
+        info!("Registered Project: {} (UUID: {})", project_name, project_id);
+
+        // 2. Process Relations (Upsert Client/Operator)
+        if client_name != "Unknown" {
+            let id = self.cloud.upsert_entity("Client", "name", client_name)?;
+            info!("Linked Project to Client: {} (UUID: {})", client_name, id);
         }
 
-        if let Some(op_val) = yaml.get("operator") {
-            if let Some(op_name) = op_val.as_str() {
-                // Upsert Operator
-                let id = self.cloud.upsert_entity("Operator", "name", op_name)?;
-                info!("Linked Project to Operator: {} (UUID: {})", op_name, id);
-            }
+        if op_name != "Unknown" {
+            let id = self.cloud.upsert_entity("Operator", "name", op_name)?;
+            info!("Linked Project to Operator: {} (UUID: {})", op_name, id);
         }
 
         Ok(())

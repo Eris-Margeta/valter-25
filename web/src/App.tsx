@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Database, User, PlusCircle, MessageSquare, Terminal, Search, AlertCircle, RefreshCw } from 'lucide-react';
+import { Database, User, PlusCircle, MessageSquare, Terminal, Search, AlertCircle, RefreshCw, Folder } from 'lucide-react';
 
 const API_URL = 'http://localhost:8000/graphql';
 
@@ -11,6 +11,7 @@ interface Entity {
 function App() {
   const [clients, setClients] = useState<Entity[]>([]);
   const [operators, setOperators] = useState<Entity[]>([]);
+  const [projects, setProjects] = useState<Entity[]>([]);
   const [oracleQuestion, setOracleQuestion] = useState('');
   const [oracleAnswer, setOracleAnswer] = useState('');
   const [isAsking, setIsAsking] = useState(false);
@@ -24,13 +25,14 @@ function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          query: '{ clients { id name } operators { id name } }'
+          query: '{ clients { id name } operators { id name } projects { id name } }'
         })
       });
       const data = await res.json();
       if (data.data) {
         setClients(data.data.clients);
         setOperators(data.data.operators);
+        setProjects(data.data.projects);
         setStatus('online');
       } else {
         setStatus('offline');
@@ -158,49 +160,69 @@ function App() {
             </div>
           </section>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-2">
+             <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700 text-center">
+                <div className="text-2xl font-bold text-blue-400">{projects.length}</div>
+                <div className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">Projects</div>
+             </div>
              <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700 text-center">
                 <div className="text-2xl font-bold text-blue-400">{clients.length}</div>
-                <div className="text-xs text-slate-400 uppercase tracking-widest mt-1">Clients</div>
+                <div className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">Clients</div>
              </div>
              <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700 text-center">
                 <div className="text-2xl font-bold text-blue-400">{operators.length}</div>
-                <div className="text-xs text-slate-400 uppercase tracking-widest mt-1">Operators</div>
+                <div className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">Operators</div>
              </div>
           </div>
         </div>
 
         {/* Center: Lists */}
         <div className="lg:col-span-2 space-y-8">
-          <section className="bg-slate-800/50 p-6 rounded-xl border border-slate-700 h-[300px] overflow-y-auto">
+          
+          <section className="bg-slate-800/50 p-6 rounded-xl border border-slate-700 h-[200px] overflow-y-auto">
             <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 sticky top-0 bg-slate-800 py-1">
-              <Database className="w-5 h-5 text-blue-400" />
-              The Cloud: Clients
+              <Folder className="w-5 h-5 text-blue-400" />
+              The Islands: Projects
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {clients.map(c => (
-                <div key={c.id} className="bg-slate-900/50 p-3 rounded border border-slate-700/50 flex items-center justify-between">
-                  <span className="text-sm font-medium">{c.name}</span>
-                  <span className="text-[10px] text-slate-500 font-mono">{c.id.slice(0,8)}</span>
+              {projects.map(p => (
+                <div key={p.id} className="bg-slate-900/50 p-3 rounded border border-slate-700/50 flex items-center justify-between group hover:border-blue-500/50 transition-colors">
+                  <span className="text-sm font-medium">{p.name}</span>
+                  <span className="text-[10px] text-slate-500 font-mono group-hover:text-blue-400">{p.id.slice(0,8)}</span>
                 </div>
               ))}
             </div>
           </section>
 
-          <section className="bg-slate-800/50 p-6 rounded-xl border border-slate-700 h-[300px] overflow-y-auto">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 sticky top-0 bg-slate-800 py-1">
-              <User className="w-5 h-5 text-blue-400" />
-              The Cloud: Operators
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {operators.map(o => (
-                <div key={o.id} className="bg-slate-900/50 p-3 rounded border border-slate-700/50 flex items-center justify-between">
-                  <span className="text-sm font-medium">{o.name}</span>
-                  <span className="text-[10px] text-slate-500 font-mono">{o.id.slice(0,8)}</span>
-                </div>
-              ))}
-            </div>
-          </section>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <section className="bg-slate-800/50 p-6 rounded-xl border border-slate-700 h-[200px] overflow-y-auto">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 sticky top-0 bg-slate-800 py-1">
+                <Database className="w-5 h-5 text-blue-400" />
+                Clients
+              </h2>
+              <div className="space-y-2">
+                {clients.map(c => (
+                  <div key={c.id} className="bg-slate-900/50 p-2 rounded border border-slate-700/50 flex items-center justify-between">
+                    <span className="text-sm font-medium">{c.name}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="bg-slate-800/50 p-6 rounded-xl border border-slate-700 h-[200px] overflow-y-auto">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 sticky top-0 bg-slate-800 py-1">
+                <User className="w-5 h-5 text-blue-400" />
+                Operators
+              </h2>
+              <div className="space-y-2">
+                {operators.map(o => (
+                  <div key={o.id} className="bg-slate-900/50 p-2 rounded border border-slate-700/50 flex items-center justify-between">
+                    <span className="text-sm font-medium">{o.name}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
 
           {/* AI Interface */}
           <section className="bg-slate-800/50 p-6 rounded-xl border border-blue-900/50 relative overflow-hidden">
@@ -214,7 +236,7 @@ function App() {
             <div className="relative">
               <textarea 
                 className="w-full bg-slate-900 border border-slate-700 rounded p-4 text-sm focus:outline-none focus:border-blue-500 h-32 resize-none"
-                placeholder="Ask the Oracle about your empire..."
+                placeholder="Ask the Oracle about your empire (e.g., 'What projects does Arnold work on?')..."
                 value={oracleQuestion}
                 onChange={e => setOracleQuestion(e.target.value)}
               />
