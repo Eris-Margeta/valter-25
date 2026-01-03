@@ -1,0 +1,13 @@
+type: "work_order"
+id: "WO-001"
+title: "Core API Scaffold"
+assigned_to: "Arnold S."
+status: "in_progress"
+priority: "high"
+estimated_hours: 20
+logged_hours: 5
+checklist:
+  - [x] "Setup Axum Server"
+  - [ ] "Implement JWT Auth"
+  - [ ] "Write Integration Tests"
+notes: "Encountered some friction with the async trait definitions."

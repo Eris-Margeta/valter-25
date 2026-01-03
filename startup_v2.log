@@ -1,0 +1,13 @@
+---------------------------------------------------
+  STRATA ENGINE - SYSTEM STARTUP
+---------------------------------------------------
+[1/2] Launching Daemon (Port 8000)...
+Waiting for Daemon...
+[2/2] Launching Interface (Port 5173)...
+---------------------------------------------------
+SYSTEM ONLINE
+>> Dashboard: http://localhost:5173
+>> GraphiQL:  http://localhost:8000/graphql
+---------------------------------------------------
+Logs are being written to strata.log and vite.log
+Press Ctrl+C to stop.

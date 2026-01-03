@@ -1,0 +1,9 @@
+type: "offer"
+id: "OFF-101"
+date: "2023-12-01"
+status: "accepted"
+items:
+  - description: "Initial System Architecture Analysis"
+    hours: 40
+    rate: 150
+    total: 6000

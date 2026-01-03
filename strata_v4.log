@@ -1,0 +1,103 @@
+   Compiling strata v0.1.0 (/Users/kovachevich/DEV/VALTER-25)
+error: multiple unused formatting arguments
+  --> src/api.rs:66:13
+   |
+65 |             "Known Clients: {{:?}}\nKnown Operators: {{:?}}", 
+   |             ------------------------------------------------ multiple missing formatting specifiers
+66 |             clients.iter().map(|(_, name)| name).collect::<Vec<_>>(),
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ argument never used
+67 |             operators.iter().map(|(_, name)| name).collect::<Vec<_>>()
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ argument never used
+   |
+help: format specifiers use curly braces, consider adding 2 format specifiers
+   |
+65 |             "Known Clients: {{:?}}\nKnown Operators: {{:?}}{}{}", 
+   |                                                            ++++
+
+error: multiple unused formatting arguments
+  --> src/api.rs:83:13
+   |
+82 |             "System: You are the Strata Oracle, an AI managing a business database.\nContext: {{}}\nUser Question: {{}}",
+   |             ------------------------------------------------------------------------------------------------------------ multiple missing formatting specifiers
+83 |             context_str, question
+   |             ^^^^^^^^^^^  ^^^^^^^^ argument never used
+   |             |
+   |             argument never used
+   |
+help: format specifiers use curly braces, consider adding 2 format specifiers
+   |
+82 |             "System: You are the Strata Oracle, an AI managing a business database.\nContext: {{}}\nUser Question: {{}}{}{}",
+   |                                                                                                                        ++++
+
+error: argument never used
+   --> src/api.rs:100:61
+    |
+100 |             Err(e) => format!("Error calling Gemini: {{}}", e)
+    |                               ----------------------------  ^ argument never used
+    |                               |
+    |                               formatting specifier missing
+    |
+help: format specifiers use curly braces, consider adding a format specifier
+    |
+100 |             Err(e) => format!("Error calling Gemini: {{}}{}", e)
+    |                                                          ++
+
+error: argument never used
+   --> src/api.rs:121:62
+    |
+121 |             return format!("Error creating directory: {{}}", e);
+    |                            --------------------------------  ^ argument never used
+    |                            |
+    |                            formatting specifier missing
+    |
+help: format specifiers use curly braces, consider adding a format specifier
+    |
+121 |             return format!("Error creating directory: {{}}{}", e);
+    |                                                           ++
+
+error: multiple unused formatting arguments
+   --> src/api.rs:127:13
+    |
+126 |             "name: \"{{}}\"\nclient: \"{{}}\"\noperator: \"{{}}\"\ncreated_at: \"{{}}\"\nstatus: \"New\"\n",
+    |             ----------------------------------------------------------------------------------------------- multiple missing formatting specifiers
+127 |             name, client, operator, chrono::Local::now().format("%Y-%m-%d")
+    |             ^^^^  ^^^^^^  ^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ argument never used
+    |             |     |       |
+    |             |     |       argument never used
+    |             |     argument never used
+    |             argument never used
+    |
+help: format specifiers use curly braces, consider adding 4 format specifiers
+    |
+126 |             "name: \"{{}}\"\nclient: \"{{}}\"\noperator: \"{{}}\"\ncreated_at: \"{{}}\"\nstatus: \"New\"\n{}{}{}{}",
+    |                                                                                                           ++++++++
+
+error: argument never used
+   --> src/api.rs:132:61
+    |
+132 |             return format!("Error writing meta.yaml: {{}}", e);
+    |                            -------------------------------  ^ argument never used
+    |                            |
+    |                            formatting specifier missing
+    |
+help: format specifiers use curly braces, consider adding a format specifier
+    |
+132 |             return format!("Error writing meta.yaml: {{}}{}", e);
+    |                                                          ++
+
+warning: unused import: `warn`
+ --> src/processor.rs:6:28
+  |
+6 | use tracing::{info, error, warn};
+  |                            ^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `context_engine::ContextEngine`
+  --> src/main.rs:11:5
+   |
+11 | use context_engine::ContextEngine;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `strata` (bin "strata") generated 2 warnings
+error: could not compile `strata` (bin "strata") due to 6 previous errors; 2 warnings emitted

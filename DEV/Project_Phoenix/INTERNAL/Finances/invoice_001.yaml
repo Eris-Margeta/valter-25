@@ -1,0 +1,9 @@
+type: "invoice"
+id: "INV-001"
+date: "2024-01-02"
+status: "unpaid"
+due_date: "2024-01-16"
+reference_offer: "OFF-101"
+amount: 3000
+currency: "USD"
+notes: "50% upfront payment for Phase 1."
