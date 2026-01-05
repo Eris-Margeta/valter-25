@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Terminal, LayoutDashboard, Database, Folder, MessageSquare, Menu, RefreshCw, Layers } from 'lucide-react';
 import { graphqlRequest, QUERIES } from './api';
-// FIX: Dodano 'type'
 import type { AppConfig, PendingAction } from './types';
 import { DynamicTable } from './components/DynamicTable';
 import { ActionCenter } from './components/ActionCenter';
@@ -74,6 +73,7 @@ function App() {
 
   if (!config) return <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">Loading Strata Engine...</div>;
 
+  // FIX: Sve reference na config sada koriste VELIKA slova (GLOBAL, CLOUDS, ISLANDS)
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex">
       
@@ -83,7 +83,7 @@ function App() {
             <Layers className="w-6 h-6" />
             <span className="font-bold tracking-widest">STRATA</span>
           </div>
-          <div className="text-xs text-slate-500 font-mono uppercase">{config.global.company_name}</div>
+          <div className="text-xs text-slate-500 font-mono uppercase">{config.GLOBAL.company_name}</div>
         </div>
 
         <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
@@ -97,7 +97,7 @@ function App() {
 
           <div>
             <div className="px-3 text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-2">Clouds</div>
-            {config.clouds.map(cloud => (
+            {config.CLOUDS.map(cloud => (
               <div 
                 key={cloud.name}
                 onClick={() => setActiveView({ type: 'cloud', name: cloud.name })}
@@ -111,7 +111,7 @@ function App() {
 
           <div>
             <div className="px-3 text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-2">Islands</div>
-            {config.islands.map(island => (
+            {config.ISLANDS.map(island => (
               <div 
                 key={island.name}
                 onClick={() => setActiveView({ type: 'island', name: island.name })}
@@ -125,7 +125,7 @@ function App() {
         </nav>
         
         <div className="p-4 border-t border-slate-800 text-xs text-slate-600 font-mono text-center">
-          V2.1.0 • {config.global.locale}
+          V2.1.0 • {config.GLOBAL.locale}
         </div>
       </aside>
 
@@ -152,7 +152,7 @@ function App() {
                 </h2>
                 <textarea 
                   className="w-full bg-slate-900 border border-slate-700 rounded p-4 text-sm focus:outline-none focus:border-blue-500 h-32 resize-none mb-4"
-                  placeholder={`Ask questions about ${config.global.company_name} data...`}
+                  placeholder={`Ask questions about ${config.GLOBAL.company_name} data...`}
                   value={oracleQ}
                   onChange={e => setOracleQ(e.target.value)}
                 />
@@ -178,7 +178,7 @@ function App() {
                       <div className="text-xs text-slate-500 uppercase mt-1">Daemon Status</div>
                    </div>
                    <div className="bg-slate-900 p-4 rounded text-center">
-                      <div className="text-2xl font-bold text-blue-400">{config.clouds.length + config.islands.length}</div>
+                      <div className="text-2xl font-bold text-blue-400">{config.CLOUDS.length + config.ISLANDS.length}</div>
                       <div className="text-xs text-slate-500 uppercase mt-1">Active Definitions</div>
                    </div>
                 </div>
@@ -186,17 +186,17 @@ function App() {
             </div>
           ) : (
             <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
-              {activeView.name && config.clouds.find(c => c.name === activeView.name) && (
+              {activeView.name && config.CLOUDS.find(c => c.name === activeView.name) && (
                 <DynamicTable 
                   type="cloud" 
-                  definition={config.clouds.find(c => c.name === activeView.name)!} 
+                  definition={config.CLOUDS.find(c => c.name === activeView.name)!} 
                   data={tableData} 
                 />
               )}
-              {activeView.name && config.islands.find(i => i.name === activeView.name) && (
+              {activeView.name && config.ISLANDS.find(i => i.name === activeView.name) && (
                 <DynamicTable 
                   type="island" 
-                  definition={config.islands.find(i => i.name === activeView.name)!} 
+                  definition={config.ISLANDS.find(i => i.name === activeView.name)!} 
                   data={tableData} 
                 />
               )}

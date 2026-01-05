@@ -83,14 +83,14 @@ warning: method `upsert_entity` is never used
     |            ^^^^^^^^^^^^^
 
 warning: `strata` (bin "strata") generated 8 warnings (run `cargo fix --bin "strata"` to apply 4 suggestions)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.53s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.37s
      Running `target/debug/strata`
-[2m2026-01-05T09:02:59.893195Z[0m [32m INFO[0m [2mstrata[0m[2m:[0m Starting TEJL Strata Daemon v0.4 (Bi-Directional)...
-[2m2026-01-05T09:02:59.894959Z[0m [32m INFO[0m [2mstrata[0m[2m:[0m Loaded Config for: TEJL d.o.o.
-[2m2026-01-05T09:02:59.896705Z[0m [32m INFO[0m [2mstrata[0m[2m:[0m --- Oracle Tools Generation ---
-[2m2026-01-05T09:02:59.897468Z[0m [32m INFO[0m [2mstrata::processor[0m[2m:[0m Scanning existing islands in: ./DEV
-[2m2026-01-05T09:02:59.899135Z[0m [32m INFO[0m [2mstrata::aggregator[0m[2m:[0m Deep Scan: Searching './DEV/Project_Phoenix/INTERNO/Financije/Racuni/*.yaml' for rule 'ukupni_prihod'
-[2m2026-01-05T09:02:59.899545Z[0m [32m INFO[0m [2mstrata::aggregator[0m[2m:[0m Deep Scan: Searching './DEV/Project_Phoenix/INTERNO/RadniNalozi/*.yaml' for rule 'ukupno_sati'
-[2m2026-01-05T09:02:59.900679Z[0m [32m INFO[0m [2mstrata::api[0m[2m:[0m GraphiQL IDE: http://localhost:8000/graphql
-[2m2026-01-05T09:02:59.903335Z[0m [32m INFO[0m [2mstrata::watcher[0m[2m:[0m Watcher initialized for path: ./DEV
-[2m2026-01-05T09:02:59.903357Z[0m [32m INFO[0m [2mstrata[0m[2m:[0m System Online. Monitoring filesystem...
+[2m2026-01-05T09:14:06.797809Z[0m [32m INFO[0m [2mstrata[0m[2m:[0m Starting TEJL Strata Daemon v0.4 (Bi-Directional)...
+[2m2026-01-05T09:14:06.800164Z[0m [32m INFO[0m [2mstrata[0m[2m:[0m Loaded Config for: TEJL d.o.o.
+[2m2026-01-05T09:14:06.803230Z[0m [32m INFO[0m [2mstrata[0m[2m:[0m --- Oracle Tools Generation ---
+[2m2026-01-05T09:14:06.804370Z[0m [32m INFO[0m [2mstrata::processor[0m[2m:[0m Scanning existing islands in: ./DEV
+[2m2026-01-05T09:14:06.805330Z[0m [32m INFO[0m [2mstrata::aggregator[0m[2m:[0m Deep Scan: Searching './DEV/Project_Phoenix/INTERNO/Financije/Racuni/*.yaml' for rule 'ukupni_prihod'
+[2m2026-01-05T09:14:06.805848Z[0m [32m INFO[0m [2mstrata::aggregator[0m[2m:[0m Deep Scan: Searching './DEV/Project_Phoenix/INTERNO/RadniNalozi/*.yaml' for rule 'ukupno_sati'
+[2m2026-01-05T09:14:06.808102Z[0m [32m INFO[0m [2mstrata::api[0m[2m:[0m GraphiQL IDE: http://localhost:8000/graphql
+[2m2026-01-05T09:14:06.809998Z[0m [32m INFO[0m [2mstrata::watcher[0m[2m:[0m Watcher initialized for path: ./DEV
+[2m2026-01-05T09:14:06.810018Z[0m [32m INFO[0m [2mstrata[0m[2m:[0m System Online. Monitoring filesystem...

@@ -14,41 +14,10 @@ export async function graphqlRequest(query: string, variables: any = {}) {
 }
 
 export const QUERIES = {
+  // FIX: Config je JSON Scalar, ne smijemo tražiti pod-polja u upitu
   GET_CONFIG: `
     query { 
-      config {
-        global {
-          company_name
-          currency_symbol
-          locale
-        }
-        clouds {
-          name
-          icon
-          fields {
-            key
-            type
-            required
-            options
-          }
-        }
-        islands {
-          name
-          root_path
-          meta_file
-          relations {
-            field
-            target_cloud
-          }
-          aggregations {
-            name
-            path
-            target_field
-            logic
-            filter
-          }
-        }
-      }
+      config
     }
   `,
   GET_CLOUD_DATA: `
@@ -61,19 +30,10 @@ export const QUERIES = {
       islandData(name: $name)
     }
   `,
+  // FIX: PendingActions je također JSON Scalar
   GET_PENDING_ACTIONS: `
     query {
-      pendingActions {
-        id
-        type
-        target_table
-        key_field
-        value
-        context
-        suggestions
-        status
-        created_at
-      }
+      pendingActions
     }
   `,
   ASK_ORACLE: `
