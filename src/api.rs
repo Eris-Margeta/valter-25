@@ -10,7 +10,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tokio::net::TcpListener;
 use crate::cloud::SqliteManager;
 use crate::config::Config;
-use crate::fs_writer::FsWriter; // NOVO
+use crate::fs_writer::FsWriter;
 use std::sync::Arc;
 use tracing::{info, error};
 use serde_json::Value;
@@ -32,29 +32,26 @@ impl QueryRoot {
 
     async fn cloud_data(&self, ctx: &Context<'_>, name: String) -> Json<Vec<Value>> {
         let state = ctx.data::<ApiState>().expect("ApiState missing");
-        if !state.config.clouds.iter().any(|c| c.name == name) {
-            return Json(vec![]);
-        }
-        match state.cloud.fetch_all_dynamic(&name) {
-            Ok(data) => Json(data),
-            Err(_) => Json(vec![]),
-        }
+        if !state.config.clouds.iter().any(|c| c.name == name) { return Json(vec![]); }
+        state.cloud.fetch_all_dynamic(&name).map(Json).unwrap_or(Json(vec![]))
     }
 
     async fn island_data(&self, ctx: &Context<'_>, name: String) -> Json<Vec<Value>> {
         let state = ctx.data::<ApiState>().expect("ApiState missing");
-        if !state.config.islands.iter().any(|i| i.name == name) {
-            return Json(vec![]);
-        }
-        match state.cloud.fetch_all_dynamic(&name) {
-            Ok(data) => Json(data),
-            Err(_) => Json(vec![]),
-        }
+        if !state.config.islands.iter().any(|i| i.name == name) { return Json(vec![]); }
+        state.cloud.fetch_all_dynamic(&name).map(Json).unwrap_or(Json(vec![]))
+    }
+
+    // NOVO: Query za čekajuće akcije (Safety Valve Dashboard)
+    async fn pending_actions(&self, ctx: &Context<'_>) -> Json<Vec<Value>> {
+        let state = ctx.data::<ApiState>().expect("ApiState missing");
+        state.cloud.fetch_pending_actions().map(Json).unwrap_or(Json(vec![]))
     }
 
     async fn ask_oracle(&self, ctx: &Context<'_>, question: String) -> String {
         let state = ctx.data::<ApiState>().expect("ApiState missing");
         
+        // Oracle sada dobiva "pametni" kontekst iz baze
         let mut context_str = String::from("System Context:\n");
         for cloud_def in &state.config.clouds {
              if let Ok(data) = state.cloud.fetch_all_dynamic(&cloud_def.name) {
@@ -95,74 +92,49 @@ pub struct MutationRoot;
 
 #[Object]
 impl MutationRoot {
-    /// Ažurira polje u Islandu (Projektu).
-    /// Primjer: updateIslandField("Projekt", "Project Phoenix", "status", "Done")
-    async fn update_island_field(
-        &self, 
-        ctx: &Context<'_>, 
-        island_type: String, // npr. "Projekt"
-        island_name: String, // npr. "Project Phoenix"
-        key: String, 
-        value: String
-    ) -> String {
+    async fn update_island_field(&self, ctx: &Context<'_>, island_type: String, island_name: String, key: String, value: String) -> String {
         let state = ctx.data::<ApiState>().expect("ApiState missing");
-
-        // 1. Nađi putanju projekta u Bazi
-        // Moramo dohvatiti 'path' kolonu iz tablice
-        let rows = match state.cloud.fetch_all_dynamic(&island_type) {
-            Ok(r) => r,
-            Err(e) => return format!("DB Error: {}", e),
-        };
-
-        // Nađi red gdje je name == island_name
-        let target_row = rows.iter().find(|r| {
-            r.get("name").and_then(|v| v.as_str()) == Some(&island_name)
-        });
-
-        if let Some(row) = target_row {
-            if let Some(path_str) = row.get("path").and_then(|v| v.as_str()) {
-                let meta_path = Path::new(path_str).join("meta.yaml");
-                
-                // 2. Piši u fajl
-                match FsWriter::update_yaml_field(&meta_path, &key, &value) {
-                    Ok(_) => return "Success".to_string(), // Watcher će odraditi sync s bazom
-                    Err(e) => return format!("Write Error: {}", e),
+        if let Ok(rows) = state.cloud.fetch_all_dynamic(&island_type) {
+            if let Some(row) = rows.iter().find(|r| r.get("name").and_then(|v| v.as_str()) == Some(&island_name)) {
+                if let Some(path_str) = row.get("path").and_then(|v| v.as_str()) {
+                    let meta_path = Path::new(path_str).join("meta.yaml");
+                    if FsWriter::update_yaml_field(&meta_path, &key, &value).is_ok() {
+                        return "Success".to_string();
+                    }
                 }
             }
         }
-
-        "Project not found".to_string()
+        "Error updating field".to_string()
     }
 
-    /// Kreira novi Island (Projekt)
-    async fn create_island(
-        &self,
-        ctx: &Context<'_>,
-        island_type: String, // npr. "Projekt"
-        name: String,
-        initial_data: String // JSON string s početnim podacima: '{"klijent": "X", "operater": "Y"}'
-    ) -> String {
+    async fn create_island(&self, ctx: &Context<'_>, island_type: String, name: String, initial_data: String) -> String {
         let state = ctx.data::<ApiState>().expect("ApiState missing");
+        if let Some(def) = state.config.islands.iter().find(|i| i.name == island_type) {
+             let parsed: std::collections::HashMap<String, String> = serde_json::from_str(&initial_data).unwrap_or_default();
+             let data: Vec<_> = parsed.into_iter().collect();
+             let root = def.root_path.replace("/*", "");
+             if FsWriter::create_island(&root, &name, data).is_ok() { return "Created".to_string(); }
+        }
+        "Error creating island".to_string()
+    }
 
-        // Nađi root path za taj tip islanda iz configa
-        let island_def = state.config.islands.iter().find(|i| i.name == island_type);
+    // NOVO: Resolve Pending Action
+    // choice: "APPROVE" (Create new) or "REJECT" (Ignore)
+    async fn resolve_action(&self, ctx: &Context<'_>, action_id: String, choice: String) -> String {
+        let state = ctx.data::<ApiState>().expect("ApiState missing");
         
-        if let Some(def) = island_def {
-            // Parsiraj JSON initial_data u Vec<(String, String)>
-            let parsed_data: std::collections::HashMap<String, String> = 
-                serde_json::from_str(&initial_data).unwrap_or_default();
-            
-            let data_vec: Vec<(String, String)> = parsed_data.into_iter().collect();
-
-            // Ukloni trailing wildcard iz root_path (npr "./DEV/*" -> "./DEV")
-            let root_clean = def.root_path.replace("/*", "");
-            
-            match FsWriter::create_island(&root_clean, &name, data_vec) {
-                Ok(_) => "Created".to_string(),
-                Err(e) => format!("Error: {}", e),
-            }
-        } else {
-            "Unknown Island Type".to_string()
+        match choice.as_str() {
+            "APPROVE" => {
+                match state.cloud.approve_pending_creation(&action_id) {
+                    Ok(id) => format!("Created Entity: {}", id),
+                    Err(e) => format!("Error approving: {}", e)
+                }
+            },
+            "REJECT" => {
+                let _ = state.cloud.reject_pending_action(&action_id);
+                "Rejected".to_string()
+            },
+            _ => "Unknown choice".to_string()
         }
     }
 }
@@ -179,7 +151,6 @@ async fn graphiql() -> impl IntoResponse {
 
 pub async fn start_server(cloud: Arc<SqliteManager>) -> anyhow::Result<()> {
     let config = Arc::new(Config::load("strata.config")?);
-
     let schema = Schema::build(QueryRoot, MutationRoot, EmptySubscription)
         .data(ApiState { cloud, config })
         .finish();
@@ -195,4 +166,3 @@ pub async fn start_server(cloud: Arc<SqliteManager>) -> anyhow::Result<()> {
     axum::serve(listener, app).await?;
     Ok(())
 }
-
