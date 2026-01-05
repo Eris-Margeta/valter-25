@@ -1,8 +1,8 @@
 # STRATA ENGINE
 
-**A Local-First, AI-Native Hyper-Converged Database System.**
+**A Local-First, AI-Native, Hyper-Converged Data Operating System.**
 
-Strata turns your filesystem into a structured, queryable, and AI-ready database. It watches your folders, indexes your metadata, and provides a GraphQL API + AI Oracle to interact with your digital empire.
+Strata turns your filesystem into a structured, queryable, and AI-ready database. It watches your folders, indexes your metadata, aggregates your finances, and provides a generic GraphQL API + AI Oracle to interact with your digital empire.
 
 ---
 
@@ -10,7 +10,7 @@ Strata turns your filesystem into a structured, queryable, and AI-ready database
 
 ### Prerequisites
 *   **Rust** (latest stable)
-*   **Node.js** (v18+) & **npm**
+*   **Node.js** (v18+) & **pnpm**
 *   **Gemini API Key** (for the Oracle)
 
 ### Installation
@@ -21,7 +21,7 @@ Strata turns your filesystem into a structured, queryable, and AI-ready database
     export GEMINI_API_KEY="your_api_key_here"
     ```
 3.  **Launch the System**
-    We provide a unified startup script:
+    We provide a unified startup script that handles cleanup, installation, and logging:
     ```bash
     ./run.sh
     ```
@@ -35,50 +35,40 @@ This will launch:
 ## 🧠 Core Concepts
 
 ### 1. The Source of Truth (`strata.config`)
-This file defines your universe. It tells Strata what "Things" exist.
-```yaml
-DEFINITIONS:
-  - CLOUD: Client
-    fields: [name, email]
-  - ISLAND: Project
-    path: "./DEV/*"
-```
+This file defines your universe (Whitelabel). It tells Strata what "Things" exist (Clients, Operators, Assets) and how to calculate metrics (Revenue, Hours).
 
-### 2. Islands (Your Files)
+### 2. Islands (Your Projects)
 Islands are folders in your `./DEV` directory. To add data to Strata, you **do not** write SQL. You simply create a folder.
-*   **Create:** `mkdir DEV/MyNewProject`
-*   **Define:** Create `DEV/MyNewProject/meta.yaml`
-    ```yaml
-    name: "My New Project"
-    client: "Acme Corp"
-    operator: "Alice"
-    ```
-*   **Result:** Strata detects this file. It automatically creates "Acme Corp" in the `Client` table and links it to the project.
+*   **Deep Scan:** Strata automatically looks into sub-folders (e.g., `INTERNAL/Finances`) to sum up invoices and hours based on your config.
 
-### 3. Clouds (The Database)
-Strata maintains a hidden SQLite database (`strata.db`) that mirrors your files. This allows for instant querying and relational integrity.
+### 3. Safety Valve (Conflict Resolution)
+Strata protects your data quality.
+*   If you type `Client: Mircosoft` (typo) in a file, Strata **will not** pollute your database.
+*   It pauses and alerts you in the **Action Center**.
+*   You can choose to **Create New**, **Ignore**, or **Fix File** (Merge) directly from the UI.
 
-### 4. The Oracle (AI)
-The system includes an AI agent aware of your database schema.
-*   **Ask:** "What projects is Alice working on?"
-*   **Answer:** The Oracle queries the live database and answers with context.
+### 4. Bi-Directional Sync
+*   **Disk -> DB:** Changing a file updates the dashboard instantly.
+*   **DB -> Disk:** Editing a status in the Dashboard updates the `meta.yaml` file on your hard drive.
 
 ---
 
 ## 🛠️ Tech Stack
 
-*   **Core:** Rust (Tokio, Axum, Rusqlite, Notify, Async-GraphQL)
+*   **Core:** Rust (Tokio, Axum, Rusqlite, Notify, Async-GraphQL, StrSim)
 *   **Frontend:** React, Vite, Tailwind CSS, Lucide
 *   **AI:** Google Gemini 1.5 Flash via REST API
 
 ## 📂 Project Structure
 
-*   `/src`: Rust Backend Source
-    *   `main.rs`: Entry point & startup logic.
-    *   `watcher.rs`: Filesystem event monitor.
-    *   `processor.rs`: Business logic for ingesting files.
-    *   `cloud.rs`: SQLite abstraction layer.
-    *   `api.rs`: GraphQL Schema & Resolvers.
-    *   `oracle.rs`: AI Tool Generation.
+*   `strata.config`: The Whitelabel Definition file.
+*   `/src`: Rust Backend
+    *   `processor.rs`: Event handling & Deep Aggregation logic.
+    *   `cloud.rs`: SQLite manager & Safety Valve logic.
+    *   `fs_writer.rs`: Safe filesystem modification.
+    *   `api.rs`: Generic GraphQL Resolvers.
 *   `/web`: React Frontend
-*   `strata.config`: Schema Definition.
+    *   `components/ActionCenter.tsx`: Interface for resolving data conflicts.
+    *   `components/DynamicTable.tsx`: Generic data grid with inline editing.
+
+
