@@ -1,0 +1,42 @@
+Odlično. Sada kada je Backend ("mozak" i "mišići") gotov i sinkroniziran, prelazimo na **Fazu 5 iz Plana: Dinamički Frontend ("Koža")**.
+
+Do sada je Frontend bio statičan (hardkodirani "Klijenti", "Projekti"). Sada ga moramo pretvoriti u **univerzalni preglednik** koji se sam izgrađuje na temelju `strata.config` kojeg dobije od Backenda.
+
+Također, moramo dodati **"Action Center"** – mjesto gdje će se pojavljivati notifikacije o konfliktima (npr. "Mircosoft" vs "Microsoft") kako bi korisnik mogao reagirati.
+
+Evo implementacije novog Frontenda.
+
+[DIRCONTXT_LLM_SNAPSHOT_V9_FRONTEND]
+
+<FILE_CONTENT_START ID="WEB_TYPES" PATH="web/src/types.ts">
+</FILE_CONTENT_END>
+
+<FILE_CONTENT_START ID="WEB_API" PATH="web/src/api.ts">
+</FILE_CONTENT_START>
+
+<FILE_CONTENT_START ID="WEB_TABLE" PATH="web/src/components/DynamicTable.tsx">
+</FILE_CONTENT_END>
+
+<FILE_CONTENT_START ID="WEB_ACTION_CENTER" PATH="web/src/components/ActionCenter.tsx">
+</FILE_CONTENT_END>
+
+</DIRCONTXT_LLM_SNAPSHOT_V9_FRONTEND]
+
+### Finalni Status Sustava
+
+**Backend:**
+1.  Prati filesystem (`DEV` folder).
+2.  Prepoznaje konfiguraciju (Klijenti, Operateri, Projekti).
+3.  Zbraja financije i sate iz podfoldera.
+4.  Detektira greške (npr. "Mircosoft") i stavlja ih na čekanje.
+
+**Frontend:**
+1.  Učitava se i pita Backend: "Tko smo mi?" (Dobije "TEJL d.o.o." i definicije).
+2.  Kreira izbornik dinamički.
+3.  Prikazuje tablice s agregiranim podacima (npr. kolona "ukupni_prihod" se prikaže automatski).
+4.  **Action Center:** U donjem desnom kutu iskače prozorčić ako Backend javi da postoji konflikt. Nudi ti da ga riješiš.
+
+**Zaključak:**
+Ovo je sada **Whitelabel Data Operating System** spreman za upotrebu (uz oprez, jer je svježe napisan). Možeš ga pokrenuti sa `./run.sh`.
+
+Želiš li još nešto doraditi prije testiranja?

@@ -1,263 +1,222 @@
 import React, { useState, useEffect } from 'react';
-import { Database, User, PlusCircle, MessageSquare, Terminal, Search, AlertCircle, RefreshCw, Folder } from 'lucide-react';
-
-const API_URL = 'http://localhost:8000/graphql';
-
-interface Entity {
-  id: string;
-  name: string;
-}
+import { Terminal, LayoutDashboard, Database, Folder, MessageSquare, Menu, RefreshCw, Layers } from 'lucide-react';
+import { graphqlRequest, QUERIES } from './api';
+import { AppConfig, PendingAction } from './types';
+import { DynamicTable } from './components/DynamicTable';
+import { ActionCenter } from './components/ActionCenter';
 
 function App() {
-  const [clients, setClients] = useState<Entity[]>([]);
-  const [operators, setOperators] = useState<Entity[]>([]);
-  const [projects, setProjects] = useState<Entity[]>([]);
-  const [oracleQuestion, setOracleQuestion] = useState('');
-  const [oracleAnswer, setOracleAnswer] = useState('');
-  const [isAsking, setIsAsking] = useState(false);
-  const [newProject, setNewProject] = useState({ name: '', client: '', operator: '' });
-  const [msg, setMsg] = useState('');
-  const [status, setStatus] = useState<'online' | 'offline' | 'connecting'>('connecting');
+  const [config, setConfig] = useState<AppConfig | null>(null);
+  const [activeView, setActiveView] = useState<{ type: 'dashboard' | 'cloud' | 'island', name?: string }>({ type: 'dashboard' });
+  const [tableData, setTableData] = useState<any[]>([]);
+  const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
+  const [oracleQ, setOracleQ] = useState('');
+  const [oracleA, setOracleA] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const fetchData = async () => {
+  // 1. Initial Load (Config & Pending Actions)
+  const init = async () => {
     try {
-      const res = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: '{ clients { id name } operators { id name } projects { id name } }'
-        })
-      });
-      const data = await res.json();
-      if (data.data) {
-        setClients(data.data.clients);
-        setOperators(data.data.operators);
-        setProjects(data.data.projects);
-        setStatus('online');
-      } else {
-        setStatus('offline');
-      }
-    } catch (err) {
-      console.error('Fetch error:', err);
-      setStatus('offline');
+      const cfgData = await graphqlRequest(QUERIES.GET_CONFIG);
+      setConfig(cfgData.config);
+      
+      refreshActions();
+    } catch (e) {
+      console.error("Failed to load config", e);
     }
   };
 
+  const refreshActions = async () => {
+    try {
+      const actionsData = await graphqlRequest(QUERIES.GET_PENDING_ACTIONS);
+      setPendingActions(actionsData.pendingActions);
+    } catch (e) { console.error(e); }
+  }
+
+  useEffect(() => { init(); }, []);
+
+  // 2. Data Fetcher based on View
   useEffect(() => {
+    const fetchData = async () => {
+      if (!activeView.name) return;
+      setLoading(true);
+      try {
+        let data;
+        if (activeView.type === 'cloud') {
+          data = await graphqlRequest(QUERIES.GET_CLOUD_DATA, { name: activeView.name });
+          setTableData(data.cloudData);
+        } else if (activeView.type === 'island') {
+          data = await graphqlRequest(QUERIES.GET_ISLAND_DATA, { name: activeView.name });
+          setTableData(data.islandData);
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
     fetchData();
-    const interval = setInterval(fetchData, 5000);
-    return () => clearInterval(interval);
-  }, []);
+    // Auto-refresh interval could go here
+  }, [activeView]);
 
   const askOracle = async () => {
-    if (!oracleQuestion) return;
-    setIsAsking(true);
+    if (!oracleQ) return;
+    setLoading(true);
     try {
-      const res = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: `query { askOracle(question: "${oracleQuestion}") }`
-        })
-      });
-      const data = await res.json();
-      setOracleAnswer(data.data.askOracle);
-    } catch (err) {
-      setOracleAnswer('The Oracle is currently silent (Connection Error).');
-    } finally {
-      setIsAsking(false);
-    }
+      const res = await graphqlRequest(QUERIES.ASK_ORACLE, { q: oracleQ });
+      setOracleA(res.askOracle);
+    } catch (e) { setOracleA("Oracle disconnected."); }
+    setLoading(false);
   };
 
-  const createProject = async () => {
-    try {
-      const res = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: `mutation { createProject(name: "${newProject.name}", client: "${newProject.client}", operator: "${newProject.operator}") }`
-        })
-      });
-      const data = await res.json();
-      setMsg(data.data.createProject);
-      setNewProject({ name: '', client: '', operator: '' });
-      fetchData();
-    } catch (err) {
-      setMsg('Failed to create project (Connection Error).');
-    }
-  };
+  if (!config) return <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">Loading Strata Engine...</div>;
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 p-8">
-      {/* Header */}
-      <header className="max-w-6xl mx-auto flex items-center justify-between mb-12">
-        <div className="flex items-center gap-3">
-          <Terminal className="text-blue-500 w-8 h-8" />
-          <h1 className="text-2xl font-bold tracking-tight">STRATA <span className="text-blue-500">DAEMON</span></h1>
+    <div className="min-h-screen bg-slate-900 text-slate-100 flex">
+      
+      {/* SIDEBAR */}
+      <aside className="w-64 border-r border-slate-800 bg-slate-900/50 flex flex-col">
+        <div className="p-6 border-b border-slate-800">
+          <div className="flex items-center gap-2 text-blue-500 mb-1">
+            <Layers className="w-6 h-6" />
+            <span className="font-bold tracking-widest">STRATA</span>
+          </div>
+          <div className="text-xs text-slate-500 font-mono uppercase">{config.GLOBAL.company_name}</div>
         </div>
-        <div className={`text-xs font-mono flex items-center gap-2 px-3 py-1 rounded-full border ${
-          status === 'online' ? 'border-green-500/30 bg-green-500/10 text-green-400' : 
-          status === 'connecting' ? 'border-yellow-500/30 bg-yellow-500/10 text-yellow-400' :
-          'border-red-500/30 bg-red-500/10 text-red-400'
-        }`}>
-          <div className={`w-2 h-2 rounded-full ${
-            status === 'online' ? 'bg-green-500 animate-pulse' : 
-            status === 'connecting' ? 'bg-yellow-500' :
-            'bg-red-500'
-          }`} />
-          SYSTEM STATUS: {status.toUpperCase()}
-        </div>
-      </header>
 
-      {status === 'offline' && (
-        <div className="max-w-6xl mx-auto mb-8 bg-red-900/20 border border-red-500/50 rounded-lg p-4 flex items-center gap-3 text-red-200">
-          <AlertCircle className="w-6 h-6 shrink-0" />
+        <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
+          {/* Dashboard Link */}
+          <div 
+            onClick={() => setActiveView({ type: 'dashboard' })}
+            className={`flex items-center gap-3 px-3 py-2 rounded cursor-pointer transition-colors ${activeView.type === 'dashboard' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
+          >
+            <LayoutDashboard size={18} />
+            <span className="text-sm font-medium">Dashboard</span>
+          </div>
+
+          {/* CLOUDS SECTION */}
           <div>
-            <p className="font-semibold">Connection Lost</p>
-            <p className="text-sm opacity-80">The Strata Daemon is unreachable. Ensure the backend is running via <code className="bg-black/30 px-1 rounded">cargo run</code>.</p>
+            <div className="px-3 text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-2">Clouds</div>
+            {config.CLOUDS.map(cloud => (
+              <div 
+                key={cloud.name}
+                onClick={() => setActiveView({ type: 'cloud', name: cloud.name })}
+                className={`flex items-center gap-3 px-3 py-2 rounded cursor-pointer transition-colors ${activeView.name === cloud.name ? 'bg-slate-800 text-blue-400' : 'text-slate-400 hover:text-white'}`}
+              >
+                <Database size={16} />
+                <span className="text-sm">{cloud.name}</span>
+              </div>
+            ))}
           </div>
-          <button onClick={fetchData} className="ml-auto hover:bg-red-500/20 p-2 rounded-full transition-colors">
-            <RefreshCw className="w-5 h-5" />
-          </button>
-        </div>
-      )}
 
-      <main className={`max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 transition-opacity duration-500 ${status === 'offline' ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+          {/* ISLANDS SECTION */}
+          <div>
+            <div className="px-3 text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-2">Islands</div>
+            {config.ISLANDS.map(island => (
+              <div 
+                key={island.name}
+                onClick={() => setActiveView({ type: 'island', name: island.name })}
+                className={`flex items-center gap-3 px-3 py-2 rounded cursor-pointer transition-colors ${activeView.name === island.name ? 'bg-slate-800 text-blue-400' : 'text-slate-400 hover:text-white'}`}
+              >
+                <Folder size={16} />
+                <span className="text-sm">{island.name}</span>
+              </div>
+            ))}
+          </div>
+        </nav>
         
-        {/* Left Column: Stats & Creation */}
-        <div className="space-y-8">
-          <section className="bg-slate-800/50 p-6 rounded-xl border border-slate-700">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <PlusCircle className="w-5 h-5 text-blue-400" />
-              Manifest New Project
-            </h2>
-            <div className="space-y-4">
-              <input 
-                className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm focus:outline-none focus:border-blue-500"
-                placeholder="Project Name"
-                value={newProject.name}
-                onChange={e => setNewProject({...newProject, name: e.target.value})}
-              />
-              <input 
-                className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm focus:outline-none focus:border-blue-500"
-                placeholder="Client Name"
-                value={newProject.client}
-                onChange={e => setNewProject({...newProject, client: e.target.value})}
-              />
-              <input 
-                className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm focus:outline-none focus:border-blue-500"
-                placeholder="Operator Name"
-                value={newProject.operator}
-                onChange={e => setNewProject({...newProject, operator: e.target.value})}
-              />
-              <button 
-                onClick={createProject}
-                className="w-full bg-blue-600 hover:bg-blue-500 py-2 rounded text-sm font-semibold transition-colors"
-              >
-                Create Island
-              </button>
-              {msg && <p className="text-xs text-blue-300 mt-2">{msg}</p>}
-            </div>
-          </section>
-
-          <div className="grid grid-cols-3 gap-2">
-             <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700 text-center">
-                <div className="text-2xl font-bold text-blue-400">{projects.length}</div>
-                <div className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">Projects</div>
-             </div>
-             <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700 text-center">
-                <div className="text-2xl font-bold text-blue-400">{clients.length}</div>
-                <div className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">Clients</div>
-             </div>
-             <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700 text-center">
-                <div className="text-2xl font-bold text-blue-400">{operators.length}</div>
-                <div className="text-[10px] text-slate-400 uppercase tracking-widest mt-1">Operators</div>
-             </div>
-          </div>
+        <div className="p-4 border-t border-slate-800 text-xs text-slate-600 font-mono text-center">
+          V2.1.0 • {config.GLOBAL.locale}
         </div>
+      </aside>
 
-        {/* Center: Lists */}
-        <div className="lg:col-span-2 space-y-8">
-          
-          <section className="bg-slate-800/50 p-6 rounded-xl border border-slate-700 h-[200px] overflow-y-auto">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 sticky top-0 bg-slate-800 py-1">
-              <Folder className="w-5 h-5 text-blue-400" />
-              The Islands: Projects
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {projects.map(p => (
-                <div key={p.id} className="bg-slate-900/50 p-3 rounded border border-slate-700/50 flex items-center justify-between group hover:border-blue-500/50 transition-colors">
-                  <span className="text-sm font-medium">{p.name}</span>
-                  <span className="text-[10px] text-slate-500 font-mono group-hover:text-blue-400">{p.id.slice(0,8)}</span>
-                </div>
-              ))}
+      {/* MAIN CONTENT */}
+      <main className="flex-1 flex flex-col h-screen overflow-hidden">
+        {/* Topbar */}
+        <header className="h-16 border-b border-slate-800 flex items-center justify-between px-8">
+          <h1 className="text-xl font-semibold">
+            {activeView.type === 'dashboard' ? 'Overview' : activeView.name}
+          </h1>
+          <div className="flex items-center gap-4">
+            {loading && <RefreshCw className="w-4 h-4 animate-spin text-blue-500" />}
+            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center font-bold text-xs">
+              AI
             </div>
-          </section>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <section className="bg-slate-800/50 p-6 rounded-xl border border-slate-700 h-[200px] overflow-y-auto">
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 sticky top-0 bg-slate-800 py-1">
-                <Database className="w-5 h-5 text-blue-400" />
-                Clients
-              </h2>
-              <div className="space-y-2">
-                {clients.map(c => (
-                  <div key={c.id} className="bg-slate-900/50 p-2 rounded border border-slate-700/50 flex items-center justify-between">
-                    <span className="text-sm font-medium">{c.name}</span>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="bg-slate-800/50 p-6 rounded-xl border border-slate-700 h-[200px] overflow-y-auto">
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 sticky top-0 bg-slate-800 py-1">
-                <User className="w-5 h-5 text-blue-400" />
-                Operators
-              </h2>
-              <div className="space-y-2">
-                {operators.map(o => (
-                  <div key={o.id} className="bg-slate-900/50 p-2 rounded border border-slate-700/50 flex items-center justify-between">
-                    <span className="text-sm font-medium">{o.name}</span>
-                  </div>
-                ))}
-              </div>
-            </section>
           </div>
+        </header>
 
-          {/* AI Interface */}
-          <section className="bg-slate-800/50 p-6 rounded-xl border border-blue-900/50 relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-10">
-              <MessageSquare className="w-24 h-24" />
+        {/* View Content */}
+        <div className="flex-1 overflow-y-auto p-8">
+          {activeView.type === 'dashboard' ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Oracle Widget */}
+              <section className="bg-slate-800/50 p-6 rounded-xl border border-blue-900/30">
+                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5 text-blue-400" />
+                  Oracle Interface
+                </h2>
+                <textarea 
+                  className="w-full bg-slate-900 border border-slate-700 rounded p-4 text-sm focus:outline-none focus:border-blue-500 h-32 resize-none mb-4"
+                  placeholder={`Ask questions about ${config.GLOBAL.company_name} data...`}
+                  value={oracleQ}
+                  onChange={e => setOracleQ(e.target.value)}
+                />
+                <button 
+                  onClick={askOracle}
+                  disabled={loading}
+                  className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded text-sm font-semibold transition-colors disabled:opacity-50"
+                >
+                  Consult Oracle
+                </button>
+                {oracleA && (
+                  <div className="mt-4 p-4 bg-slate-900 rounded border-l-2 border-blue-500 text-sm leading-relaxed text-slate-300">
+                    {oracleA}
+                  </div>
+                )}
+              </section>
+
+              {/* Stats Widget (Placeholder based on Aggregations) */}
+              <section className="bg-slate-800/50 p-6 rounded-xl border border-slate-700">
+                <h2 className="text-lg font-semibold mb-4">System Status</h2>
+                <div className="grid grid-cols-2 gap-4">
+                   <div className="bg-slate-900 p-4 rounded text-center">
+                      <div className="text-2xl font-bold text-green-400">Online</div>
+                      <div className="text-xs text-slate-500 uppercase mt-1">Daemon Status</div>
+                   </div>
+                   <div className="bg-slate-900 p-4 rounded text-center">
+                      <div className="text-2xl font-bold text-blue-400">{config.CLOUDS.length + config.ISLANDS.length}</div>
+                      <div className="text-xs text-slate-500 uppercase mt-1">Active Definitions</div>
+                   </div>
+                </div>
+              </section>
             </div>
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-blue-400" />
-              The Oracle
-            </h2>
-            <div className="relative">
-              <textarea 
-                className="w-full bg-slate-900 border border-slate-700 rounded p-4 text-sm focus:outline-none focus:border-blue-500 h-32 resize-none"
-                placeholder="Ask the Oracle about your empire (e.g., 'What projects does Arnold work on?')..."
-                value={oracleQuestion}
-                onChange={e => setOracleQuestion(e.target.value)}
-              />
-              <button 
-                onClick={askOracle}
-                disabled={isAsking}
-                className="absolute bottom-4 right-4 bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded text-xs font-bold uppercase transition-colors flex items-center gap-2 disabled:opacity-50"
-              >
-                {isAsking ? 'Consulting...' : <><Search className="w-3 h-3" /> Question</>}
-              </button>
+          ) : (
+            /* Dynamic Table View */
+            <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
+              {activeView.name && config.CLOUDS.find(c => c.name === activeView.name) && (
+                <DynamicTable 
+                  type="cloud" 
+                  definition={config.CLOUDS.find(c => c.name === activeView.name)!} 
+                  data={tableData} 
+                />
+              )}
+              {activeView.name && config.ISLANDS.find(i => i.name === activeView.name) && (
+                <DynamicTable 
+                  type="island" 
+                  definition={config.ISLANDS.find(i => i.name === activeView.name)!} 
+                  data={tableData} 
+                />
+              )}
             </div>
-            {oracleAnswer && (
-              <div className="mt-4 p-4 bg-blue-900/20 border border-blue-500/20 rounded text-sm text-blue-100 leading-relaxed italic">
-                "{oracleAnswer}"
-              </div>
-            )}
-          </section>
+          )}
         </div>
       </main>
+
+      {/* SAFETY VALVE NOTIFICATIONS */}
+      <ActionCenter actions={pendingActions} onResolve={refreshActions} />
     </div>
   );
 }
 
 export default App;
+
