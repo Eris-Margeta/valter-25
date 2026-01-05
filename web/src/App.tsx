@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Terminal, LayoutDashboard, Database, Folder, MessageSquare, Menu, RefreshCw, Layers } from 'lucide-react';
 import { graphqlRequest, QUERIES } from './api';
-import { AppConfig, PendingAction } from './types';
+// FIX: Dodano 'type'
+import type { AppConfig, PendingAction } from './types';
 import { DynamicTable } from './components/DynamicTable';
 import { ActionCenter } from './components/ActionCenter';
 
@@ -14,14 +15,11 @@ function App() {
   const [oracleA, setOracleA] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // 1. Initial Load (Config & Pending Actions)
   const init = async () => {
     try {
       const cfgData = await graphqlRequest(QUERIES.GET_CONFIG);
-      // Config data comes in nested under 'config' key
       setConfig(cfgData.config);
-      
-      refreshActions(); // Load pending actions
+      refreshActions();
     } catch (e) {
       console.error("Failed to load config", e);
     }
@@ -30,7 +28,6 @@ function App() {
   const refreshActions = async () => {
     try {
       const actionsData = await graphqlRequest(QUERIES.GET_PENDING_ACTIONS);
-      // Pending actions data comes in nested under 'pendingActions' key
       setPendingActions(actionsData.pendingActions);
     } catch (e) { 
       console.error("Failed to fetch pending actions:", e); 
@@ -39,10 +36,9 @@ function App() {
 
   useEffect(() => { init(); }, []);
 
-  // 2. Data Fetcher based on View
   useEffect(() => {
     const fetchData = async () => {
-      if (!config) return; // Wait for config to load
+      if (!config) return;
       
       setLoading(true);
       try {
@@ -54,8 +50,8 @@ function App() {
           data = await graphqlRequest(QUERIES.GET_ISLAND_DATA, { name: activeView.name! });
           setTableData(data.islandData);
         } else if (activeView.type === 'pending_actions') {
-          await refreshActions(); // Refresh pending actions list
-          setTableData(pendingActions); // Use local state for table
+          await refreshActions();
+          setTableData(pendingActions);
         }
       } catch (e) {
         console.error(e);
@@ -64,8 +60,7 @@ function App() {
       }
     };
     fetchData();
-    // Auto-refresh interval could go here
-  }, [activeView, config]); // Rerun when activeView or config changes
+  }, [activeView, config]);
 
   const askOracle = async () => {
     if (!oracleQ) return;
@@ -82,7 +77,6 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex">
       
-      {/* SIDEBAR */}
       <aside className="w-64 border-r border-slate-800 bg-slate-900/50 flex flex-col">
         <div className="p-6 border-b border-slate-800">
           <div className="flex items-center gap-2 text-blue-500 mb-1">
@@ -93,7 +87,6 @@ function App() {
         </div>
 
         <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
-          {/* Dashboard Link */}
           <div 
             onClick={() => setActiveView({ type: 'dashboard' })}
             className={`flex items-center gap-3 px-3 py-2 rounded cursor-pointer transition-colors ${activeView.type === 'dashboard' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
@@ -102,7 +95,6 @@ function App() {
             <span className="text-sm font-medium">Dashboard</span>
           </div>
 
-          {/* CLOUDS SECTION */}
           <div>
             <div className="px-3 text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-2">Clouds</div>
             {config.clouds.map(cloud => (
@@ -117,7 +109,6 @@ function App() {
             ))}
           </div>
 
-          {/* ISLANDS SECTION */}
           <div>
             <div className="px-3 text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-2">Islands</div>
             {config.islands.map(island => (
@@ -138,9 +129,7 @@ function App() {
         </div>
       </aside>
 
-      {/* MAIN CONTENT */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
-        {/* Topbar */}
         <header className="h-16 border-b border-slate-800 flex items-center justify-between px-8">
           <h1 className="text-xl font-semibold">
             {activeView.type === 'dashboard' ? 'Overview' : activeView.name}
@@ -153,11 +142,9 @@ function App() {
           </div>
         </header>
 
-        {/* View Content */}
         <div className="flex-1 overflow-y-auto p-8">
           {activeView.type === 'dashboard' ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Oracle Widget */}
               <section className="bg-slate-800/50 p-6 rounded-xl border border-blue-900/30">
                 <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <MessageSquare className="w-5 h-5 text-blue-400" />
@@ -183,7 +170,6 @@ function App() {
                 )}
               </section>
 
-              {/* Stats Widget (Placeholder based on Aggregations) */}
               <section className="bg-slate-800/50 p-6 rounded-xl border border-slate-700">
                 <h2 className="text-lg font-semibold mb-4">System Status</h2>
                 <div className="grid grid-cols-2 gap-4">
@@ -199,7 +185,6 @@ function App() {
               </section>
             </div>
           ) : (
-            /* Dynamic Table View */
             <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
               {activeView.name && config.clouds.find(c => c.name === activeView.name) && (
                 <DynamicTable 
@@ -220,7 +205,6 @@ function App() {
         </div>
       </main>
 
-      {/* SAFETY VALVE NOTIFICATIONS */}
       <ActionCenter actions={pendingActions} onResolve={refreshActions} />
     </div>
   );

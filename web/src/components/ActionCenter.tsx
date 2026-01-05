@@ -1,6 +1,7 @@
 import React from 'react';
 import { AlertTriangle, Check, X, GitMerge } from 'lucide-react';
-import { PendingAction } from '../types';
+// FIX: Dodano 'type'
+import type { PendingAction } from '../types';
 import { graphqlRequest, MUTATIONS } from '../api';
 
 interface Props {
@@ -34,7 +35,6 @@ export function ActionCenter({ actions, onResolve }: Props) {
               Unknown {action.target_table} ({action.key_field}): <span className="text-yellow-400">"{action.value}"</span>
             </p>
             
-            {/* Prijedlozi (Fuzzy Match) */}
             {action.suggestions && action.suggestions.length > 0 && (
                <div className="mb-3 bg-slate-800 p-2 rounded text-xs">
                  <p className="text-slate-500 mb-1 flex items-center gap-1"><GitMerge size={12}/> Did you mean?</p>

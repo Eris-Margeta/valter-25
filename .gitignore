@@ -1,2 +1,11 @@
+# Dodajemo logove u ignore da ne prljaju repo
 /target
-node_modules
+/debug
+/dist
+/node_modules
+*.log
+strata.db
+strata.db-journal
+.env
+.DS_Store
+

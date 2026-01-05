@@ -1,3 +1,4 @@
+// Osiguravamo da su svi tipovi exportani
 export interface GlobalConfig {
   company_name: string;
   currency_symbol: string;
@@ -44,6 +45,7 @@ export interface AppConfig {
   islands: IslandDefinition[];
 }
 
+// OVO JE ONO ŠTO JE NEDOSTAJALO ILI BILO KEŠIRANO KRIVO
 export interface PendingAction {
   id: string;
   type: string; // npr. 'CreateEntity'
