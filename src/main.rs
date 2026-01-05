@@ -5,10 +5,11 @@ mod cloud;
 mod api;
 mod oracle;
 mod processor;
+mod aggregator;
+mod fs_writer; // NOVO
 
 use config::Config;
 use watcher::Watcher;
-use context_engine::ContextEngine;
 use cloud::SqliteManager;
 use oracle::ToolGenerator;
 use processor::EventProcessor;
@@ -19,43 +20,34 @@ use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Load .env
     dotenv::dotenv().ok();
-
-    // Initialize tracing
     tracing_subscriber::fmt::init();
 
-    info!("Starting Strata Daemon...");
+    info!("Starting TEJL Strata Daemon v0.4 (Bi-Directional)...");
 
-    // Load Configuration
     let config_path = "strata.config";
     let config = match Config::load(config_path) {
         Ok(cfg) => {
-            info!("Successfully loaded configuration from {}", config_path);
+            info!("Loaded Config for: {}", cfg.global.company_name);
             Arc::new(cfg)
         },
         Err(e) => {
-            error!("Failed to load configuration: {}", e);
+            error!("Config Error: {}", e);
             return Err(e);
         }
     };
 
-    // Initialize Cloud Layer (SQLite)
     let db_path = "strata.db";
     let cloud = Arc::new(SqliteManager::new(db_path)?);
     cloud.init_schema(&config)?;
 
-    // PHASE 5 TEST: Oracle Tool Generation
-    info!("--- PHASE 5 TEST: Oracle Tool Generation ---");
-    match ToolGenerator::generate_tools(&config) {
-        Ok(tools) => {
-            let json_out = serde_json::to_string_pretty(&tools)?;
-            info!("Generated OpenAI Tools Schema (Length: {} chars)", json_out.len());
-        },
-        Err(e) => error!("Failed to generate tools: {}", e),
+    // Oracle
+    info!("--- Oracle Tools Generation ---");
+    if let Ok(tools) = ToolGenerator::generate_tools(&config) {
+        let _ = serde_json::to_string(&tools);
     }
 
-    // Start API Server (Phase 4)
+    // Start API
     let cloud_clone = cloud.clone();
     tokio::spawn(async move {
         if let Err(e) = api::start_server(cloud_clone).await {
@@ -63,25 +55,20 @@ async fn main() -> Result<()> {
         }
     });
 
-    // Initialize Event Processor (Phase 6)
     let processor = EventProcessor::new(cloud.clone(), config.clone());
-
-    // SCAN EXISTING METADATA (Fix for missing data on startup)
+    
+    // Initial Scan
     processor.scan_existing_metadata("./DEV");
 
-    // Create channel for file events
     let (tx, mut rx) = mpsc::channel(100);
-
-    // Initialize Watcher on "./DEV"
     let _watcher = Watcher::new("./DEV", tx)?;
 
-    info!("Strata Daemon running. Waiting for file events in ./DEV...");
+    info!("System Online. Monitoring filesystem...");
 
-    // Event Loop
     while let Some(event) = rx.recv().await {
-        // Dispatch to Processor
         processor.handle_event(event).await;
     }
 
     Ok(())
 }
+
