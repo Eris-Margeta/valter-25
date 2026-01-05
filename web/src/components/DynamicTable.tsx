@@ -1,6 +1,6 @@
-
 import React from 'react';
-import { CloudDefinition, IslandDefinition } from '../types';
+// FIX: Dodali smo 'type' ovdje da kompajler zna da su ovo samo sučelja
+import type { CloudDefinition, IslandDefinition } from '../types';
 
 interface Props {
   definition: CloudDefinition | IslandDefinition;
@@ -9,14 +9,12 @@ interface Props {
 }
 
 export function DynamicTable({ definition, data, type }: Props) {
-  // Izračunaj koje kolone prikazati
   const columns = React.useMemo(() => {
     if (type === 'cloud') {
       const def = definition as CloudDefinition;
       return def.fields.map(f => f.key);
     } else {
       const def = definition as IslandDefinition;
-      // Za Islande (Projekte) prikazujemo fiksna polja + agregacije
       return ['name', 'status', ...def.aggregations.map(a => a.name), 'updated_at'];
     }
   }, [definition, type]);
@@ -40,7 +38,6 @@ export function DynamicTable({ definition, data, type }: Props) {
             <tr key={row.id || i} className="hover:bg-slate-800/50 transition-colors">
               {columns.map(col => (
                 <td key={`${row.id}-${col}`} className="px-4 py-3">
-                  {/* Formatiranje vrijednosti */}
                   {typeof row[col] === 'number' 
                     ? row[col].toLocaleString('hr-HR', { maximumFractionDigits: 2 }) 
                     : row[col] || '-'}
@@ -53,3 +50,4 @@ export function DynamicTable({ definition, data, type }: Props) {
     </div>
   );
 }
+

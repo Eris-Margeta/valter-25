@@ -421,7 +421,7 @@ dependencies = [
  "ident_case",
  "proc-macro2",
  "quote",
- "strsim",
+ "strsim 0.11.1",
  "syn",
 ]
 
@@ -434,7 +434,7 @@ dependencies = [
  "ident_case",
  "proc-macro2",
  "quote",
- "strsim",
+ "strsim 0.11.1",
  "syn",
 ]
 
@@ -732,6 +732,12 @@ dependencies = [
  "r-efi",
  "wasip2",
 ]
+
+[[package]]
+name = "glob"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
 
 [[package]]
 name = "globset"
@@ -2007,7 +2013,7 @@ checksum = "d7beae5182595e9a8b683fa98c4317f956c9a2dec3b9716990d20023cc60c766"
 
 [[package]]
 name = "strata"
-version = "0.1.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -2015,6 +2021,7 @@ dependencies = [
  "axum",
  "chrono",
  "dotenv",
+ "glob",
  "ignore",
  "notify",
  "regex",
@@ -2023,6 +2030,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "strsim 0.10.0",
  "tokio",
  "tokio-stream",
  "tower-http",
@@ -2031,6 +2039,12 @@ dependencies = [
  "uuid",
  "walkdir",
 ]
+
+[[package]]
+name = "strsim"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "strsim"

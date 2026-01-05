@@ -1,4 +1,3 @@
-
 const API_URL = 'http://localhost:8000/graphql';
 
 export async function graphqlRequest(query: string, variables: any = {}) {
@@ -17,7 +16,39 @@ export async function graphqlRequest(query: string, variables: any = {}) {
 export const QUERIES = {
   GET_CONFIG: `
     query { 
-      config 
+      config {
+        global {
+          company_name
+          currency_symbol
+          locale
+        }
+        clouds {
+          name
+          icon
+          fields {
+            key
+            type
+            required
+            options
+          }
+        }
+        islands {
+          name
+          root_path
+          meta_file
+          relations {
+            field
+            target_cloud
+          }
+          aggregations {
+            name
+            path
+            target_field
+            logic
+            filter
+          }
+        }
+      }
     }
   `,
   GET_CLOUD_DATA: `
@@ -32,7 +63,17 @@ export const QUERIES = {
   `,
   GET_PENDING_ACTIONS: `
     query {
-      pendingActions
+      pendingActions {
+        id
+        type
+        target_table
+        key_field
+        value
+        context
+        suggestions
+        status
+        created_at
+      }
     }
   `,
   ASK_ORACLE: `
@@ -49,3 +90,4 @@ export const MUTATIONS = {
     }
   `
 };
+

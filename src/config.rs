@@ -1,50 +1,89 @@
-use serde::Deserialize;
-use std::collections::HashMap;
-use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::fs;
+use anyhow::Result;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Config {
-    #[serde(rename = "DEFINITIONS")]
-    pub definitions: Vec<Definition>,
-    #[serde(rename = "VIEWS")]
-    pub views: Option<Vec<View>>,
+    #[serde(rename = "GLOBAL")]
+    pub global: GlobalConfig,
+    
+    #[serde(rename = "CLOUDS")]
+    pub clouds: Vec<CloudDefinition>,
+    
+    #[serde(rename = "ISLANDS")]
+    pub islands: Vec<IslandDefinition>,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-pub enum Definition {
-    Cloud(CloudDef),
-    Island(IslandDef),
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct GlobalConfig {
+    pub company_name: String,
+    pub currency_symbol: String,
+    pub locale: String,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct CloudDef {
-    #[serde(rename = "CLOUD")]
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct CloudDefinition {
     pub name: String,
-    pub fields: Vec<String>,
+    pub icon: String,
+    pub fields: Vec<CloudField>,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct IslandDef {
-    #[serde(rename = "ISLAND")]
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct CloudField {
+    pub key: String,
+    #[serde(rename = "type")]
+    pub field_type: String,
+    #[serde(default)]
+    pub required: bool,
+    #[serde(default)]
+    pub options: Option<Vec<String>>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct IslandDefinition {
+    pub name: String,
+    pub root_path: String,
+    pub meta_file: String,
+    #[serde(default)]
+    pub relations: Vec<RelationRule>,
+    #[serde(default)]
+    pub aggregations: Vec<AggregationRule>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct RelationRule {
+    pub field: String,
+    pub target_cloud: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct AggregationRule {
     pub name: String,
     pub path: String,
-    pub meta_file: String,
-    pub relations: Option<Vec<HashMap<String, String>>>,
+    pub target_field: String,
+    pub logic: AggregationLogic,
+    #[serde(default)]
+    pub filter: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct View {
-    #[serde(rename = "GRAPH")]
-    pub name: String,
-    pub logic: String,
+#[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum AggregationLogic {
+    Sum,
+    Count,
+    Average,
 }
 
 impl Config {
     pub fn load(path: &str) -> Result<Self> {
         let content = fs::read_to_string(path)?;
-        let config = serde_yaml::from_str(&content)?;
+        let config: Config = serde_yaml::from_str(&content)?;
+        
+        if config.clouds.is_empty() {
+            anyhow::bail!("Configuration must define at least one CLOUD.");
+        }
+        
         Ok(config)
     }
 }
+

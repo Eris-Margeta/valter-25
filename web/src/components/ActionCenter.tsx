@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { AlertTriangle, Check, X, GitMerge } from 'lucide-react';
 import { PendingAction } from '../types';
@@ -32,7 +31,7 @@ export function ActionCenter({ actions, onResolve }: Props) {
           <div key={action.id} className="bg-slate-900 p-3 rounded border border-slate-700">
             <p className="text-xs text-slate-400 mb-1">{action.context}</p>
             <p className="text-sm font-medium text-white mb-2">
-              Unknown {action.target_table}: <span className="text-yellow-400">"{action.value}"</span>
+              Unknown {action.target_table} ({action.key_field}): <span className="text-yellow-400">"{action.value}"</span>
             </p>
             
             {/* Prijedlozi (Fuzzy Match) */}
@@ -68,3 +67,4 @@ export function ActionCenter({ actions, onResolve }: Props) {
     </div>
   );
 }
+

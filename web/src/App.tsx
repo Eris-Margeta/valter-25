@@ -7,7 +7,7 @@ import { ActionCenter } from './components/ActionCenter';
 
 function App() {
   const [config, setConfig] = useState<AppConfig | null>(null);
-  const [activeView, setActiveView] = useState<{ type: 'dashboard' | 'cloud' | 'island', name?: string }>({ type: 'dashboard' });
+  const [activeView, setActiveView] = useState<{ type: 'dashboard' | 'cloud' | 'island' | 'pending_actions', name?: string }>({ type: 'dashboard' });
   const [tableData, setTableData] = useState<any[]>([]);
   const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
   const [oracleQ, setOracleQ] = useState('');
@@ -18,9 +18,10 @@ function App() {
   const init = async () => {
     try {
       const cfgData = await graphqlRequest(QUERIES.GET_CONFIG);
+      // Config data comes in nested under 'config' key
       setConfig(cfgData.config);
       
-      refreshActions();
+      refreshActions(); // Load pending actions
     } catch (e) {
       console.error("Failed to load config", e);
     }
@@ -29,8 +30,11 @@ function App() {
   const refreshActions = async () => {
     try {
       const actionsData = await graphqlRequest(QUERIES.GET_PENDING_ACTIONS);
+      // Pending actions data comes in nested under 'pendingActions' key
       setPendingActions(actionsData.pendingActions);
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+      console.error("Failed to fetch pending actions:", e); 
+    }
   }
 
   useEffect(() => { init(); }, []);
@@ -38,16 +42,20 @@ function App() {
   // 2. Data Fetcher based on View
   useEffect(() => {
     const fetchData = async () => {
-      if (!activeView.name) return;
+      if (!config) return; // Wait for config to load
+      
       setLoading(true);
       try {
         let data;
         if (activeView.type === 'cloud') {
-          data = await graphqlRequest(QUERIES.GET_CLOUD_DATA, { name: activeView.name });
+          data = await graphqlRequest(QUERIES.GET_CLOUD_DATA, { name: activeView.name! });
           setTableData(data.cloudData);
         } else if (activeView.type === 'island') {
-          data = await graphqlRequest(QUERIES.GET_ISLAND_DATA, { name: activeView.name });
+          data = await graphqlRequest(QUERIES.GET_ISLAND_DATA, { name: activeView.name! });
           setTableData(data.islandData);
+        } else if (activeView.type === 'pending_actions') {
+          await refreshActions(); // Refresh pending actions list
+          setTableData(pendingActions); // Use local state for table
         }
       } catch (e) {
         console.error(e);
@@ -57,7 +65,7 @@ function App() {
     };
     fetchData();
     // Auto-refresh interval could go here
-  }, [activeView]);
+  }, [activeView, config]); // Rerun when activeView or config changes
 
   const askOracle = async () => {
     if (!oracleQ) return;
@@ -81,7 +89,7 @@ function App() {
             <Layers className="w-6 h-6" />
             <span className="font-bold tracking-widest">STRATA</span>
           </div>
-          <div className="text-xs text-slate-500 font-mono uppercase">{config.GLOBAL.company_name}</div>
+          <div className="text-xs text-slate-500 font-mono uppercase">{config.global.company_name}</div>
         </div>
 
         <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
@@ -97,11 +105,11 @@ function App() {
           {/* CLOUDS SECTION */}
           <div>
             <div className="px-3 text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-2">Clouds</div>
-            {config.CLOUDS.map(cloud => (
+            {config.clouds.map(cloud => (
               <div 
                 key={cloud.name}
                 onClick={() => setActiveView({ type: 'cloud', name: cloud.name })}
-                className={`flex items-center gap-3 px-3 py-2 rounded cursor-pointer transition-colors ${activeView.name === cloud.name ? 'bg-slate-800 text-blue-400' : 'text-slate-400 hover:text-white'}`}
+                className={`flex items-center gap-3 px-3 py-2 rounded cursor-pointer transition-colors ${activeView.name === cloud.name && activeView.type === 'cloud' ? 'bg-blue-800 text-blue-400' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
               >
                 <Database size={16} />
                 <span className="text-sm">{cloud.name}</span>
@@ -112,11 +120,11 @@ function App() {
           {/* ISLANDS SECTION */}
           <div>
             <div className="px-3 text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-2">Islands</div>
-            {config.ISLANDS.map(island => (
+            {config.islands.map(island => (
               <div 
                 key={island.name}
                 onClick={() => setActiveView({ type: 'island', name: island.name })}
-                className={`flex items-center gap-3 px-3 py-2 rounded cursor-pointer transition-colors ${activeView.name === island.name ? 'bg-slate-800 text-blue-400' : 'text-slate-400 hover:text-white'}`}
+                className={`flex items-center gap-3 px-3 py-2 rounded cursor-pointer transition-colors ${activeView.name === island.name && activeView.type === 'island' ? 'bg-blue-800 text-blue-400' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
               >
                 <Folder size={16} />
                 <span className="text-sm">{island.name}</span>
@@ -126,7 +134,7 @@ function App() {
         </nav>
         
         <div className="p-4 border-t border-slate-800 text-xs text-slate-600 font-mono text-center">
-          V2.1.0 • {config.GLOBAL.locale}
+          V2.1.0 • {config.global.locale}
         </div>
       </aside>
 
@@ -157,7 +165,7 @@ function App() {
                 </h2>
                 <textarea 
                   className="w-full bg-slate-900 border border-slate-700 rounded p-4 text-sm focus:outline-none focus:border-blue-500 h-32 resize-none mb-4"
-                  placeholder={`Ask questions about ${config.GLOBAL.company_name} data...`}
+                  placeholder={`Ask questions about ${config.global.company_name} data...`}
                   value={oracleQ}
                   onChange={e => setOracleQ(e.target.value)}
                 />
@@ -184,7 +192,7 @@ function App() {
                       <div className="text-xs text-slate-500 uppercase mt-1">Daemon Status</div>
                    </div>
                    <div className="bg-slate-900 p-4 rounded text-center">
-                      <div className="text-2xl font-bold text-blue-400">{config.CLOUDS.length + config.ISLANDS.length}</div>
+                      <div className="text-2xl font-bold text-blue-400">{config.clouds.length + config.islands.length}</div>
                       <div className="text-xs text-slate-500 uppercase mt-1">Active Definitions</div>
                    </div>
                 </div>
@@ -193,17 +201,17 @@ function App() {
           ) : (
             /* Dynamic Table View */
             <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
-              {activeView.name && config.CLOUDS.find(c => c.name === activeView.name) && (
+              {activeView.name && config.clouds.find(c => c.name === activeView.name) && (
                 <DynamicTable 
                   type="cloud" 
-                  definition={config.CLOUDS.find(c => c.name === activeView.name)!} 
+                  definition={config.clouds.find(c => c.name === activeView.name)!} 
                   data={tableData} 
                 />
               )}
-              {activeView.name && config.ISLANDS.find(i => i.name === activeView.name) && (
+              {activeView.name && config.islands.find(i => i.name === activeView.name) && (
                 <DynamicTable 
                   type="island" 
-                  definition={config.ISLANDS.find(i => i.name === activeView.name)!} 
+                  definition={config.islands.find(i => i.name === activeView.name)!} 
                   data={tableData} 
                 />
               )}

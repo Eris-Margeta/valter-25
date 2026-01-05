@@ -42,7 +42,6 @@ impl QueryRoot {
         state.cloud.fetch_all_dynamic(&name).map(Json).unwrap_or(Json(vec![]))
     }
 
-    // NOVO: Query za čekajuće akcije (Safety Valve Dashboard)
     async fn pending_actions(&self, ctx: &Context<'_>) -> Json<Vec<Value>> {
         let state = ctx.data::<ApiState>().expect("ApiState missing");
         state.cloud.fetch_pending_actions().map(Json).unwrap_or(Json(vec![]))
@@ -51,7 +50,6 @@ impl QueryRoot {
     async fn ask_oracle(&self, ctx: &Context<'_>, question: String) -> String {
         let state = ctx.data::<ApiState>().expect("ApiState missing");
         
-        // Oracle sada dobiva "pametni" kontekst iz baze
         let mut context_str = String::from("System Context:\n");
         for cloud_def in &state.config.clouds {
              if let Ok(data) = state.cloud.fetch_all_dynamic(&cloud_def.name) {
@@ -118,11 +116,8 @@ impl MutationRoot {
         "Error creating island".to_string()
     }
 
-    // NOVO: Resolve Pending Action
-    // choice: "APPROVE" (Create new) or "REJECT" (Ignore)
     async fn resolve_action(&self, ctx: &Context<'_>, action_id: String, choice: String) -> String {
         let state = ctx.data::<ApiState>().expect("ApiState missing");
-        
         match choice.as_str() {
             "APPROVE" => {
                 match state.cloud.approve_pending_creation(&action_id) {
@@ -166,3 +161,4 @@ pub async fn start_server(cloud: Arc<SqliteManager>) -> anyhow::Result<()> {
     axum::serve(listener, app).await?;
     Ok(())
 }
+

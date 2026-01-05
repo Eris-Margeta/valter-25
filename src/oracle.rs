@@ -1,4 +1,4 @@
-use crate::config::{Config, Definition};
+use crate::config::Config;
 use serde_json::{json, Value};
 use anyhow::Result;
 
@@ -8,11 +8,37 @@ impl ToolGenerator {
     pub fn generate_tools(config: &Config) -> Result<Value> {
         let mut tools = Vec::new();
 
-        // Generate tools for Clouds (Tables)
-        for def in &config.definitions {
-            if let Definition::Cloud(cloud) = def {
-                let tool_name = format!("get_{}", cloud.name.to_lowercase());
-                let description = format!("Retrieve information about {}", cloud.name);
+        // 1. Generiraj alate za CLOUDS (Tablice)
+        for cloud in &config.clouds {
+            let tool_name = format!("get_{}", cloud.name.to_lowercase());
+            let description = format!("Dohvati detalje za entitet '{}' iz baze.", cloud.name);
+            
+            let tool = json!({
+                "type": "function",
+                "function": {
+                    "name": tool_name,
+                    "description": description,
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string",
+                                "description": format!("UUID za {}", cloud.name)
+                            }
+                        },
+                        "required": ["id"]
+                    }
+                }
+            });
+            tools.push(tool);
+        }
+
+        // 2. Generiraj alate za ISLANDS (Projekti i Agregacije)
+        for island in &config.islands {
+            for agg in &island.aggregations {
+                let tool_name = format!("get_{}_{}", island.name.to_lowercase(), agg.name.to_lowercase());
+                // FIX: Koristimo {:?} za ispis Enuma (Sum, Count...)
+                let description = format!("Izračunaj '{}' ({:?}) za {}.", agg.name, agg.logic, island.name);
                 
                 let tool = json!({
                     "type": "function",
@@ -22,35 +48,12 @@ impl ToolGenerator {
                         "parameters": {
                             "type": "object",
                             "properties": {
-                                "id": {
+                                "project_name": {
                                     "type": "string",
-                                    "description": format!("The UUID of the {}", cloud.name)
-                                },
-                                // Add dynamic fields if needed
+                                    "description": "Ime projekta (npr. 'Project Phoenix')"
+                                }
                             },
-                            "required": ["id"]
-                        }
-                    }
-                });
-                tools.push(tool);
-            }
-        }
-
-        // Generate tools for Views
-        if let Some(views) = &config.views {
-            for view in views {
-                let tool_name = format!("query_{}", view.name.to_lowercase());
-                let description = format!("Analytical view: {}", view.logic);
-                
-                let tool = json!({
-                    "type": "function",
-                    "function": {
-                        "name": tool_name,
-                        "description": description,
-                        "parameters": {
-                            "type": "object",
-                            "properties": {},
-                            "required": []
+                            "required": ["project_name"]
                         }
                     }
                 });
@@ -61,3 +64,4 @@ impl ToolGenerator {
         Ok(json!(tools))
     }
 }
+
