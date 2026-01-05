@@ -1,0 +1,42 @@
+Razumijem. Idemo "zatvoriti krug". Ovo je zadnjih 10% koji pretvaraju sustav iz "gledatelja" u "upravitelja".
+
+Fokusiramo se na **Interakciju**:
+1.  **Inline Edit:** Da možeš kliknuti na "Status" u tablici i promijeniti ga.
+2.  **Smart Merge:** Da Action Center ne služi samo za ignoriranje, već da jednim klikom popravi tipfeler u fajlu.
+3.  **Dokumentacija:** Ažuriranje `DEVELOPER_GUIDE.md` da odražava novu arhitekturu.
+
+Evo potrebnih izmjena.
+
+[DIRCONTXT_LLM_SNAPSHOT_FINAL_INTERACTION]
+
+### 1. BACKEND: Pametniji Kontekst (src/processor.rs)
+Moramo promijeniti kako spremamo kontekst u `pending_actions` tablicu. Umjesto rečenice "Pronađeno u projektu...", spremit ćemo čisti JSON. Tako će Frontend znati točno *koji* projekt treba popraviti.
+
+
+### 2. FRONTEND API (Dodajemo mutaciju za update)
+Moramo omogućiti Frontendu da pozove `updateIslandField`.
+
+
+### 3. FRONTEND TABLICA (Inline Editing)
+Sada tablica prepoznaje dvoklik (ili klik) i pretvara se u input polje.
+
+
+### 4. FRONTEND ACTION CENTER (Smart Merge)
+Sada Action Center zna popraviti fajl!
+
+
+### 5. DOKUMENTACIJA (Zacementirano Znanje)
+Ažuriramo Developer Guide da nitko u budućnosti ne pita "kako ovo radi?".
+
+
+### 6. Ažuriranje App.tsx (Callback za refresh)
+Moramo proslijediti `fetchData` u `DynamicTable` da se tablica osvježi nakon editiranja.
+
+</DIRCONTXT_LLM_SNAPSHOT_FINAL_INTERACTION]
+
+**Upute:**
+1.  Zamijeni `src/processor.rs` (Backend) da podrži JSON kontekst.
+2.  Zamijeni sve frontend fajlove (`api.ts`, `DynamicTable.tsx`, `ActionCenter.tsx`, `App.tsx`) i `DEVELOPER_GUIDE.md`.
+3.  **VAŽNO:** Kako smo mijenjali `src/processor.rs`, moraš restartati `./run.sh` da se backend ponovno kompajlira.
+
+Nakon ovoga, **Plan 2 je 100% završen**. Sustav je kompletan.

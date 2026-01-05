@@ -14,7 +14,6 @@ export async function graphqlRequest(query: string, variables: any = {}) {
 }
 
 export const QUERIES = {
-  // FIX: Config je JSON Scalar, ne smijemo tražiti pod-polja u upitu
   GET_CONFIG: `
     query { 
       config
@@ -30,7 +29,6 @@ export const QUERIES = {
       islandData(name: $name)
     }
   `,
-  // FIX: PendingActions je također JSON Scalar
   GET_PENDING_ACTIONS: `
     query {
       pendingActions
@@ -47,6 +45,12 @@ export const MUTATIONS = {
   RESOLVE_ACTION: `
     mutation($id: String!, $choice: String!) {
       resolveAction(actionId: $id, choice: $choice)
+    }
+  `,
+  // NOVO: Za inline editing i merge
+  UPDATE_ISLAND_FIELD: `
+    mutation($type: String!, $name: String!, $key: String!, $value: String!) {
+      updateIslandField(islandType: $type, islandName: $name, key: $key, value: $value)
     }
   `
 };

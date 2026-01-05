@@ -9,6 +9,7 @@ use serde_yaml::Value;
 use std::fs;
 use std::collections::HashMap;
 use walkdir::WalkDir;
+use serde_json::json; // NOVO
 
 pub struct EventProcessor {
     cloud: Arc<SqliteManager>,
@@ -38,8 +39,6 @@ impl EventProcessor {
                     info!("Metadata Change: {:?}", path);
                     let _ = self.process_metadata(&path);
                 } else if path.extension().map_or(false, |ext| ext == "yaml") {
-                    // Ako se promijeni pod-fajl (račun), re-skeniraj projekt.
-                    // Tražimo meta.yaml u parent direktorijima.
                     let mut current = path.parent();
                     while let Some(dir) = current {
                         let meta_path = dir.join("meta.yaml");
@@ -59,7 +58,6 @@ impl EventProcessor {
         let content = fs::read_to_string(path)?;
         let yaml: Value = serde_yaml::from_str(&content)?;
 
-        // Pretpostavljamo prvi tip islanda iz configa (Projekt)
         let island_def = &self.config.islands[0]; 
 
         let project_name = yaml.get("name")
@@ -68,28 +66,28 @@ impl EventProcessor {
 
         let project_root = path.parent().unwrap();
 
-        // --- RELACIJE s provjerom (Safety Valve) ---
         let mut relation_map: HashMap<String, Option<String>> = HashMap::new();
         
         for rel in &island_def.relations {
             if let Some(val_raw) = yaml.get(&rel.field) {
                 if let Some(val_str) = val_raw.as_str() {
-                    // Određivanje ključnog polja (npr. Operater -> ime, Klijent -> naziv)
-                    // Ovo bi trebalo biti dio Configa, ali za sad heuristika:
-                    // Ako Cloud ima polje 'naziv', koristi to. Ako ima 'ime', koristi to.
-                    // Za TEJL config znamo točno.
                     let key_field = if rel.target_cloud == "Operater" { "ime" } else { "naziv" };
-                    let context_info = format!("Pronađeno u projektu: {}", project_name);
+                    
+                    // FIX: Spremamo JSON kontekst da Frontend može napraviti "Merge/Fix"
+                    // Ovo omogućuje ActionCenter-u da zna koji projekt updateati
+                    let context_info = json!({
+                        "source_island_type": island_def.name,
+                        "source_island_name": project_name,
+                        "field": rel.field
+                    }).to_string();
 
-                    // PROVJERA (Check or Pending)
                     match self.cloud.check_or_create_pending(&rel.target_cloud, key_field, val_str, &context_info) {
                         Ok(status) => match status {
                             EntityStatus::Found(uuid) => {
                                 relation_map.insert(rel.field.clone(), Some(uuid));
                             },
                             EntityStatus::Pending(_) | EntityStatus::Ambiguous(_, _) => {
-                                warn!("Relation '{}' ({}) is PENDING review. Not linking yet.", rel.field, val_str);
-                                // Ostavljamo NULL u bazi. Frontend će prikazati upozorenje.
+                                warn!("Relation '{}' ({}) is PENDING review.", rel.field, val_str);
                                 relation_map.insert(rel.field.clone(), None);
                             }
                         },
@@ -99,10 +97,8 @@ impl EventProcessor {
             }
         }
 
-        // --- AGREGACIJE (Deep Scan) ---
         let aggregation_results = Aggregator::calculate(project_root, &island_def.aggregations)?;
         
-        // --- SPREMANJE (Upsert Island) ---
         self.cloud.upsert_island(
             &island_def.name,
             project_name,
@@ -114,3 +110,4 @@ impl EventProcessor {
         Ok(())
     }
 }
+

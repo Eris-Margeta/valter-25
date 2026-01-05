@@ -1,68 +1,37 @@
-# STRATA DEVELOPER GUIDE
+# STRATA DEVELOPER GUIDE (V2.0)
 
 ## Architecture Overview
+Strata is a **Hyper-Converged Data Operating System**. It unifies the Filesystem (Source of Truth), SQLite (Performance Cache), and AI (Intelligence).
 
-Strata is an **Event-Driven Architecture**. It does not poll; it reacts.
+### 1. The Core Loop (Bi-Directional)
+The system ensures data integrity through a strict loop:
 
-### Data Flow Pipeline
-1.  **Event:** User saves `DEV/Project_X/meta.yaml`.
-2.  **Watcher (`src/watcher.rs`):** `notify` crate detects the OS signal. Debounces the event (prevents duplicate triggers). Sends event to MPSC Channel.
-3.  **Loop (`src/main.rs`):** The main Tokio loop receives the message.
-4.  **Processor (`src/processor.rs`):**
-    *   Reads the file content.
-    *   Parses YAML.
-    *   Extracts "Relational Fields" (Client, Operator) based on hardcoded logic (Prototype limitation) or `strata.config` (Goal).
-5.  **Cloud (`src/cloud.rs`):**
-    *   **Upsert Logic:** Checks if the entity (e.g., "Acme Corp") exists in the SQL table.
-    *   If NO: Generates UUID v4 -> INSERT -> Returns UUID.
-    *   If YES: SELECT id -> Returns UUID.
-6.  **Sky (`src/api.rs`):** The GraphQL API now has fresh data to serve.
+1.  **Change:** User edits a file OR Frontend calls `updateIslandField`.
+2.  **Detection:** `Watcher` detects FS event -> `Processor` parses YAML.
+3.  **Aggregation:** `Aggregator` recursively scans sub-folders (deep scan) defined in `strata.config` to calculate totals (e.g., Revenue).
+4.  **Validation (The Safety Valve):**
+    *   New entities (Clients/Operators) are checked against the DB via `strsim` (Fuzzy Match).
+    *   **Ambiguity:** If a name is similar to an existing one (e.g., "Mircosoft"), a `PendingAction` is created. **No data is committed.**
+    *   **Resolution:** User resolves via Frontend Action Center -> System fixes the file on disk -> Loop restarts.
+5.  **Commit:** Clean data is upserted to SQLite tables.
+6.  **View:** GraphQL API serves clean, aggregated JSON to Frontend/AI.
 
----
+### 2. Configuration (`strata.config`)
+This file drives the entire engine.
+*   **GLOBAL:** Company details.
+*   **CLOUDS:** SQL Tables definition (Clients, Operators).
+*   **ISLANDS:** Project definitions & Aggregation Rules.
 
-## extending the System
+### 3. Extending the System
+**Do not modify Rust code for business logic.**
+*   To add a new field (e.g., "Phone Number" to Client): Add it to `strata.config`. The backend adapts automatically.
+*   To add a new metric (e.g., "Total Bugs"): Add an `aggregation` rule in `strata.config` pointing to your bug tracker files.
 
-### How to Add a New Entity (e.g., "Department")
+### 4. Frontend Development
+*   **Dynamic:** Never hardcode table columns. Use `GET_CONFIG` query to render UI.
+*   **Action Center:** Always check `GET_PENDING_ACTIONS`. This is how users handle data conflicts.
 
-1.  **Update Configuration:**
-    Edit `strata.config`:
-    ```yaml
-    - CLOUD: Department
-      fields: [name, head_of_dept]
-    ```
+### 5. Troubleshooting
+*   **Logs:** Check `strata.log` (Backend) and `vite.log` (Frontend).
+*   **Data missing?** Check if `meta.yaml` is valid YAML. Check if a Pending Action is blocking the update.
 
-2.  **Update Processor Logic:**
-    Edit `src/processor.rs` to look for the new field in `meta.yaml`:
-    ```rust
-    if let Some(dept_val) = yaml.get("department") {
-        if let Some(dept_name) = dept_val.as_str() {
-            self.cloud.upsert_entity("Department", "name", dept_name)?;
-        }
-    }
-    ```
-
-3.  **Update API Schema:**
-    Edit `src/api.rs` to expose the new table:
-    ```rust
-    async fn departments(&self, ctx: &Context<'_>) -> Vec<Entity> {
-        // ... fetch from cloud ...
-    }
-    ```
-
-### Frontend Development
-The frontend is a standard Vite+React app.
-*   **Location:** `/web`
-*   **State Management:** Local React State (for prototype). Recommend moving to TanStack Query for production.
-*   **Styling:** Tailwind CSS (v4 configuration).
-
-### Debugging
-*   **Backend Logs:** `cargo run` prints structured logs via `tracing`. Look for `INFO` messages regarding "Upsert" and "Linked Project".
-*   **Frontend Logs:** Check Browser Console (F12).
-
----
-
-## Known Limitations (Prototype)
-
-1.  **Schema Rigidity:** `src/processor.rs` currently has hardcoded field mapping (Client, Operator, Project). It does not yet fully dynamically map *every* field in `strata.config` to SQL columns automatically.
-2.  **Filesystem Scan:** Currently only scans `meta.yaml` in direct subdirectories of `./DEV`. Nested islands logic needs expansion.
-3.  **Graph API:** The "Graph" is simulated via SQL Foreign Keys. A true GraphDB layer (like Petgraph or creating an adjacency matrix) is planned for Phase 2.

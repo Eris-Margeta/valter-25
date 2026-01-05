@@ -1,64 +1,93 @@
 import React from 'react';
-import { AlertTriangle, Check, X, GitMerge } from 'lucide-react';
-// FIX: Dodano 'type'
+import { AlertTriangle, Check, X, GitMerge, ArrowRight } from 'lucide-react';
 import type { PendingAction } from '../types';
 import { graphqlRequest, MUTATIONS } from '../api';
 
 interface Props {
   actions: PendingAction[];
-  onResolve: () => void; // Callback to refresh data
+  onResolve: () => void;
 }
 
 export function ActionCenter({ actions, onResolve }: Props) {
   if (actions.length === 0) return null;
 
-  const handleResolve = async (id: string, choice: 'APPROVE' | 'REJECT') => {
+  const handleCreateNew = async (id: string) => {
+    try { await graphqlRequest(MUTATIONS.RESOLVE_ACTION, { id, choice: 'APPROVE' }); onResolve(); } 
+    catch (e) { alert("Error: " + e); }
+  };
+
+  const handleIgnore = async (id: string) => {
+    try { await graphqlRequest(MUTATIONS.RESOLVE_ACTION, { id, choice: 'REJECT' }); onResolve(); } 
+    catch (e) { alert("Error: " + e); }
+  };
+
+  const handleMerge = async (action: PendingAction, suggestion: string) => {
     try {
-      await graphqlRequest(MUTATIONS.RESOLVE_ACTION, { id, choice });
+      // 1. Parsiraj kontekst da saznamo gdje je greška (koji projekt, koje polje)
+      const ctx = JSON.parse(action.context);
+      
+      // 2. Pozovi mutaciju da ispraviš fajl (updateIslandField)
+      await graphqlRequest(MUTATIONS.UPDATE_ISLAND_FIELD, {
+        type: ctx.source_island_type, // npr. "Projekt"
+        name: ctx.source_island_name, // npr. "Project Phoenix"
+        key: ctx.field,               // npr. "klijent"
+        value: suggestion             // npr. "Microsoft" (ispravno ime)
+      });
+
+      // 3. Odbaci pending action jer smo popravili uzrok
+      await graphqlRequest(MUTATIONS.RESOLVE_ACTION, { id: action.id, choice: 'REJECT' });
+      
       onResolve();
     } catch (e) {
-      alert("Error resolving action: " + e);
+      alert("Auto-fix failed. Context might be old text format? " + e);
     }
   };
 
   return (
-    <div className="fixed bottom-6 right-6 w-96 bg-slate-800 border border-yellow-500/50 rounded-lg shadow-2xl overflow-hidden z-50">
-      <div className="bg-yellow-500/10 p-3 border-b border-yellow-500/20 flex items-center gap-2">
+    <div className="fixed bottom-6 right-6 w-96 bg-slate-800 border border-yellow-500/50 rounded-lg shadow-2xl overflow-hidden z-50 flex flex-col max-h-[80vh]">
+      <div className="bg-yellow-500/10 p-3 border-b border-yellow-500/20 flex items-center gap-2 shrink-0">
         <AlertTriangle className="w-5 h-5 text-yellow-500 animate-pulse" />
-        <h3 className="font-bold text-yellow-100 text-sm">Action Required ({actions.length})</h3>
+        <h3 className="font-bold text-yellow-100 text-sm">Conflict Resolution ({actions.length})</h3>
       </div>
-      <div className="max-h-[60vh] overflow-y-auto p-4 space-y-4">
+      <div className="overflow-y-auto p-4 space-y-4">
         {actions.map(action => (
-          <div key={action.id} className="bg-slate-900 p-3 rounded border border-slate-700">
-            <p className="text-xs text-slate-400 mb-1">{action.context}</p>
-            <p className="text-sm font-medium text-white mb-2">
-              Unknown {action.target_table} ({action.key_field}): <span className="text-yellow-400">"{action.value}"</span>
-            </p>
+          <div key={action.id} className="bg-slate-900 p-3 rounded border border-slate-700 shadow-sm">
+            <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-2">Unknown Entry</p>
+            <div className="flex items-center gap-2 mb-4 bg-black/20 p-2 rounded">
+               <span className="text-red-400 line-through decoration-red-500/50">{action.value}</span>
+               <ArrowRight size={14} className="text-slate-500" />
+               <span className="text-yellow-400 font-bold">?</span>
+            </div>
             
+            {/* Prijedlozi (Merge opcije) */}
             {action.suggestions && action.suggestions.length > 0 && (
-               <div className="mb-3 bg-slate-800 p-2 rounded text-xs">
-                 <p className="text-slate-500 mb-1 flex items-center gap-1"><GitMerge size={12}/> Did you mean?</p>
+               <div className="mb-4 space-y-2">
+                 <p className="text-xs text-slate-400 flex items-center gap-1"><GitMerge size={12}/> Link to existing:</p>
                  {action.suggestions.map(s => (
-                   <div key={s} className="text-blue-300 font-mono ml-2">• {s}</div>
+                   <button 
+                     key={s}
+                     onClick={() => handleMerge(action, s)}
+                     className="w-full text-left text-xs bg-blue-900/20 hover:bg-blue-900/40 text-blue-300 border border-blue-800/30 p-2 rounded transition-colors flex items-center justify-between group"
+                   >
+                     {s}
+                     <span className="opacity-0 group-hover:opacity-100 text-[10px] uppercase font-bold">Fix File</span>
+                   </button>
                  ))}
-                 <div className="text-[10px] text-slate-500 mt-1 italic">
-                   (Tip: Fix typo in file to auto-resolve)
-                 </div>
                </div>
             )}
 
-            <div className="flex gap-2 mt-2">
+            <div className="flex gap-2 border-t border-slate-800 pt-3">
               <button 
-                onClick={() => handleResolve(action.id, 'APPROVE')}
-                className="flex-1 bg-green-900/30 hover:bg-green-900/50 text-green-400 border border-green-700/50 py-1 px-2 rounded text-xs flex items-center justify-center gap-1 transition-colors"
+                onClick={() => handleCreateNew(action.id)}
+                className="flex-1 bg-green-900/20 hover:bg-green-900/40 text-green-400 py-2 rounded text-xs font-semibold transition-colors"
               >
-                <Check size={14} /> Create New
+                Create New
               </button>
               <button 
-                onClick={() => handleResolve(action.id, 'REJECT')}
-                className="flex-1 bg-red-900/30 hover:bg-red-900/50 text-red-400 border border-red-700/50 py-1 px-2 rounded text-xs flex items-center justify-center gap-1 transition-colors"
+                onClick={() => handleIgnore(action.id)}
+                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-400 py-2 rounded text-xs font-semibold transition-colors"
               >
-                <X size={14} /> Ignore
+                Ignore
               </button>
             </div>
           </div>
