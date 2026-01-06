@@ -1,7 +1,6 @@
 use crate::aggregator::Aggregator;
 use crate::cloud::{EntityStatus, SqliteManager};
 use crate::config::{Config, IslandDefinition};
-use glob::Pattern;
 use notify::Event;
 use serde_json::json;
 use serde_yaml::Value;

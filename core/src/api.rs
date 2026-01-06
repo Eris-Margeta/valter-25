@@ -1,11 +1,14 @@
+// core/src/api.rs (ISPRAVLJENO)
+
 use crate::cloud::SqliteManager;
 use crate::config::Config;
 use crate::fs_writer::FsWriter;
+use crate::processor::EventProcessor; // Dodano za rescan
 use async_graphql::{Context, EmptySubscription, Json, Object, Schema};
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
 use axum::{
     extract::Extension,
-    http::{header, Method, StatusCode, Uri}, // Added Method
+    http::{header, Method, StatusCode, Uri},
     response::{Html, IntoResponse},
     routing::get,
     Router,
@@ -25,9 +28,9 @@ struct Assets;
 pub struct ApiState {
     pub cloud: Arc<SqliteManager>,
     pub config: Arc<Config>,
+    pub processor: Arc<EventProcessor>, // DODANO: Treba nam procesor za rescan
 }
 
-// --- GRAPHQL ---
 pub struct QueryRoot;
 
 #[Object]
@@ -39,9 +42,6 @@ impl QueryRoot {
 
     async fn cloud_data(&self, ctx: &Context<'_>, name: String) -> Json<Vec<Value>> {
         let state = ctx.data::<ApiState>().expect("ApiState missing");
-        if !state.config.clouds.iter().any(|c| c.name == name) {
-            return Json(vec![]);
-        }
         state
             .cloud
             .fetch_all_dynamic(&name)
@@ -51,9 +51,6 @@ impl QueryRoot {
 
     async fn island_data(&self, ctx: &Context<'_>, name: String) -> Json<Vec<Value>> {
         let state = ctx.data::<ApiState>().expect("ApiState missing");
-        if !state.config.islands.iter().any(|i| i.name == name) {
-            return Json(vec![]);
-        }
         state
             .cloud
             .fetch_all_dynamic(&name)
@@ -72,7 +69,6 @@ impl QueryRoot {
 
     async fn ask_oracle(&self, ctx: &Context<'_>, question: String) -> String {
         let state = ctx.data::<ApiState>().expect("ApiState missing");
-
         let mut context_str = String::from("System Context:\n");
         for cloud in &state.config.clouds {
             context_str.push_str(&format!("Table: {}\n", cloud.name));
@@ -111,6 +107,14 @@ pub struct MutationRoot;
 
 #[Object]
 impl MutationRoot {
+    // DODANO: rescanIslands mutacija
+    async fn rescan_islands(&self, ctx: &Context<'_>) -> String {
+        let state = ctx.data::<ApiState>().expect("ApiState missing");
+        info!("Manual Rescan Requested via API");
+        state.processor.scan_on_startup();
+        "Rescan Complete".to_string()
+    }
+
     async fn update_island_field(
         &self,
         ctx: &Context<'_>,
@@ -209,18 +213,20 @@ async fn static_handler(uri: Uri) -> impl IntoResponse {
 pub async fn start_server(
     cloud: Arc<SqliteManager>,
     config: Arc<Config>,
+    processor: Arc<EventProcessor>, // DODANO: Proslijedi procesor
     mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
 ) -> anyhow::Result<()> {
     let schema = Schema::build(QueryRoot, MutationRoot, EmptySubscription)
         .data(ApiState {
             cloud,
             config: config.clone(),
-        })
+            processor,
+        }) // DODANO: Stavi procesor u state
         .finish();
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
-        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_methods(vec![Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers([header::CONTENT_TYPE, header::ACCEPT]);
 
     let app = Router::new()
@@ -231,17 +237,14 @@ pub async fn start_server(
 
     let port = config.global.port;
     let addr = format!("0.0.0.0:{}", port);
-
     info!("🚀 API available at: http://localhost:{}", port);
 
     let listener = TcpListener::bind(&addr).await?;
-
     axum::serve(listener, app)
         .with_graceful_shutdown(async move {
             shutdown_rx.recv().await.ok();
             info!("API shutting down for reload...");
         })
         .await?;
-
     Ok(())
 }
