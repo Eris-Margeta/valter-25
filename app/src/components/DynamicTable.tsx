@@ -1,111 +1,68 @@
-import React, { useState } from 'react';
-import type { CloudDefinition, IslandDefinition } from '../types';
-import { graphqlRequest, MUTATIONS } from '../api';
-import { Check, X, Edit2 } from 'lucide-react';
+import React from "react";
+import { ChevronRight } from "lucide-react";
 
-interface Props {
-  definition: CloudDefinition | IslandDefinition;
+interface DynamicTableProps {
   data: any[];
-  type: 'cloud' | 'island';
-  onUpdate?: () => void; // Refresh callback
+  title?: string;
+  onRowClick?: (row: any) => void;
 }
 
-export function DynamicTable({ definition, data, type, onUpdate }: Props) {
-  const [editingCell, setEditingCell] = useState<{ id: string, col: string, val: string } | null>(null);
+export function DynamicTable({ data, title, onRowClick }: DynamicTableProps) {
+  if (!data || data.length === 0) {
+    return (
+      <div className="text-slate-500 italic p-4 border border-slate-800 rounded-lg">
+        No data available for {title}
+      </div>
+    );
+  }
 
-  const columns = React.useMemo(() => {
-    if (type === 'cloud') {
-      const def = definition as CloudDefinition;
-      return def.fields.map(f => f.key);
-    } else {
-      const def = definition as IslandDefinition;
-      // Samo određena polja su editabilna (ona iz meta.yaml, ne agregacije)
-      return ['name', 'status', ...def.aggregations.map(a => a.name), 'updated_at'];
-    }
-  }, [definition, type]);
-
-  // Koja polja smijemo editirati? (Samo osnovna, ne izračunata)
-  const isEditable = (col: string) => {
-    if (type === 'cloud') return false; // Cloud editiranje još nije podržano u FsWriteru
-    if (col === 'updated_at' || col.startsWith('ukupno') || col.startsWith('total')) return false;
-    return true;
-  };
-
-  const handleSave = async () => {
-    if (!editingCell) return;
-    try {
-      // Pretpostavljamo da red ima 'name' polje koje je ID projekta
-      const row = data.find(d => d.id === editingCell.id);
-      if (!row) return;
-
-      await graphqlRequest(MUTATIONS.UPDATE_ISLAND_FIELD, {
-        type: definition.name,
-        name: row.name, // Koristimo ime projekta kao identifikator
-        key: editingCell.col,
-        value: editingCell.val
-      });
-      
-      setEditingCell(null);
-      if (onUpdate) onUpdate();
-    } catch (e) {
-      alert("Update failed: " + e);
-    }
-  };
+  // Infer columns from the first row, excluding complex objects/arrays
+  const columns = Object.keys(data[0]).filter((key) => {
+    const val = data[0][key];
+    return typeof val !== "object" || val === null;
+  });
 
   return (
-    <div className="overflow-x-auto min-h-[300px]">
-      <table className="w-full text-left text-sm">
-        <thead className="bg-slate-800 text-slate-400 uppercase font-bold text-xs sticky top-0">
-          <tr>
-            {columns.map(col => (
-              <th key={col} className="px-4 py-3">{col.replace(/_/g, ' ')}</th>
-            ))}
-            <th className="px-4 py-3 w-10"></th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-700">
-          {data.map((row, i) => (
-            <tr key={row.id || i} className="hover:bg-slate-800/50 transition-colors group">
-              {columns.map(col => (
-                <td key={`${row.id}-${col}`} className="px-4 py-3 relative">
-                  {editingCell?.id === row.id && editingCell?.col === col ? (
-                    <div className="flex items-center gap-1 absolute inset-0 px-2 bg-slate-800 z-10">
-                      <input 
-                        autoFocus
-                        className="w-full bg-slate-900 border border-blue-500 rounded px-2 py-1 text-white outline-none"
-                        value={editingCell.val}
-                        onChange={e => setEditingCell({...editingCell, val: e.target.value})}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') handleSave();
-                          if (e.key === 'Escape') setEditingCell(null);
-                        }}
-                      />
-                      <button onClick={handleSave} className="text-green-400 hover:text-green-300"><Check size={14}/></button>
-                      <button onClick={() => setEditingCell(null)} className="text-red-400 hover:text-red-300"><X size={14}/></button>
-                    </div>
-                  ) : (
-                    <div 
-                      className={`flex items-center gap-2 ${isEditable(col) ? 'cursor-pointer hover:text-blue-300' : ''}`}
-                      onClick={() => {
-                        if (isEditable(col)) setEditingCell({ id: row.id, col, val: String(row[col] || '') });
-                      }}
-                    >
-                      <span>
-                        {typeof row[col] === 'number' 
-                          ? row[col].toLocaleString('hr-HR', { maximumFractionDigits: 2 }) 
-                          : row[col] || '-'}
-                      </span>
-                      {isEditable(col) && <Edit2 size={10} className="opacity-0 group-hover:opacity-30" />}
-                    </div>
-                  )}
-                </td>
+    <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-slate-800/50 text-slate-400 uppercase font-bold text-xs">
+            <tr>
+              {columns.map((col) => (
+                <th key={col} className="px-6 py-4 tracking-wider">
+                  {col.replace(/_/g, " ")}
+                </th>
               ))}
-              <td className="px-4 py-3"></td>
+              <th className="px-6 py-4 w-10"></th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-slate-800">
+            {data.map((row, i) => (
+              <tr
+                key={i}
+                onClick={() => onRowClick && onRowClick(row)}
+                className={`transition-colors group ${
+                  onRowClick
+                    ? "cursor-pointer hover:bg-slate-800 hover:text-white"
+                    : ""
+                }`}
+              >
+                {columns.map((col) => (
+                  <td key={col} className="px-6 py-4 text-slate-300 group-hover:text-white transition-colors">
+                    {String(row[col] ?? "-")}
+                  </td>
+                ))}
+                <td className="px-6 py-4 text-slate-600 group-hover:text-indigo-400">
+                  {onRowClick && <ChevronRight size={16} />}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="px-6 py-3 bg-slate-800/30 border-t border-slate-800 text-xs text-slate-500 text-right">
+        Showing {data.length} entries
+      </div>
     </div>
   );
 }
-
