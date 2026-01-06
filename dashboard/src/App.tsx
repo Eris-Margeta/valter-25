@@ -1,4 +1,3 @@
-[FILE_CONTENT_START ID="F084" PATH="dashboard/src/App.tsx"]
 import { useState, useEffect, useCallback } from 'react';
 import { LayoutDashboard, Database, Folder, MessageSquare, Layers, RefreshCw, AlertCircle, RotateCcw } from 'lucide-react';
 import { graphqlRequest, QUERIES, MUTATIONS } from './api';
@@ -181,4 +180,3 @@ function App() {
   );
 }
 export default App;
-[FILE_CONTENT_END ID="F084"]
