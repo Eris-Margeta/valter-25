@@ -34,7 +34,7 @@ This mode is for **contributors** or for **testing** the system using the includ
 
 1.  **Clone the Repository**
     ```bash
-    git clone https://github.com/yourusername/valter.git
+    git clone https://github.com/Eris-Margeta/valter-25.git
     cd valter
     ```
 
@@ -73,7 +73,7 @@ Go to your home directory and edit the configuration to point to your real work 
 # ~/.valter/valter.config
 ISLANDS:
   - name: "Project"
-    root_path: "/Users/me/MyActualBusiness/*" # <--- UPDATE THIS
+    root_path: "/Users/me/MyActualBusinessFolder/*" # <--- UPDATE THIS
 ```
 
 ### 3. Run
@@ -119,7 +119,7 @@ Valter protects your data quality.
 *   **Core (Backend):** Rust (Tokio, Axum, Rusqlite, Notify, Async-GraphQL).
 *   **Dashboard (Frontend):** React 19, Vite, Tailwind CSS, Lucide.
 *   **Docs (Website):** Astro Framework.
-*   **AI:** Google Gemini 1.5 Flash via REST API.
+*   **AI:** Google Gemini 2.5 Flash via REST API.
 
 ## 📂 Project Structure
 
