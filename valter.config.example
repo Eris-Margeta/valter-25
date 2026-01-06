@@ -29,9 +29,9 @@
 # ---------------------------------------------------------
 
 GLOBAL:
-  company_name: "My Valter Company"
+  company_name: "TEJL"
   currency_symbol: "€"
-  locale: "en_US"
+  locale: "hr_HR"
   port: 9090 # <--- PRODUCTION PORT (Different from Dev)
 
 CLOUDS:
@@ -51,11 +51,12 @@ CLOUDS:
 
 ISLANDS:
   - name: "Project"
-    root_path: "/Users/username/MyProjects/*"  
+    root_path: "/Users/kovachevich/DEV/*"  
     meta_file: "meta.yaml" 
     relations:
       - field: "operator"
         target_cloud: "Operator"
       - field: "client"
         target_cloud: "Client"
+
 

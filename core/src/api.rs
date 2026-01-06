@@ -5,7 +5,7 @@ use async_graphql::{Context, EmptySubscription, Json, Object, Schema};
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
 use axum::{
     extract::Extension,
-    http::{header, StatusCode, Uri},
+    http::{header, Method, StatusCode, Uri}, // Added Method
     response::{Html, IntoResponse},
     routing::get,
     Router,
@@ -18,7 +18,6 @@ use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 
-// Embed Frontend (Dashboard)
 #[derive(RustEmbed)]
 #[folder = "../dashboard/dist"]
 struct Assets;
@@ -28,8 +27,7 @@ pub struct ApiState {
     pub config: Arc<Config>,
 }
 
-// --- GRAPHQL DEFINITIONS ---
-
+// --- GRAPHQL ---
 pub struct QueryRoot;
 
 #[Object]
@@ -76,17 +74,8 @@ impl QueryRoot {
         let state = ctx.data::<ApiState>().expect("ApiState missing");
 
         let mut context_str = String::from("System Context:\n");
-        for cloud_def in &state.config.clouds {
-            if let Ok(data) = state.cloud.fetch_all_dynamic(&cloud_def.name) {
-                let preview: Vec<_> = data.iter().take(20).collect();
-                context_str.push_str(&format!("Table '{}': {:?}\n", cloud_def.name, preview));
-            }
-        }
-        for island_def in &state.config.islands {
-            if let Ok(data) = state.cloud.fetch_all_dynamic(&island_def.name) {
-                let preview: Vec<_> = data.iter().take(20).collect();
-                context_str.push_str(&format!("Projects '{}': {:?}\n", island_def.name, preview));
-            }
+        for cloud in &state.config.clouds {
+            context_str.push_str(&format!("Table: {}\n", cloud.name));
         }
 
         let api_key = std::env::var("GEMINI_API_KEY").unwrap_or_default();
@@ -97,23 +86,23 @@ impl QueryRoot {
         let client = reqwest::Client::new();
         let url = format!("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={}", api_key);
         let prompt = format!(
-            "Role: Valter Oracle for {}.\nData:\n{}\nUser Query: {}",
-            state.config.global.company_name, context_str, question
+            "Role: Valter Oracle.\nContext: {}\nQuery: {}",
+            context_str, question
         );
         let body = serde_json::json!({ "contents": [{ "parts": [{"text": prompt}] }] });
 
         match client.post(&url).json(&body).send().await {
-            Ok(res) => {
-                if let Ok(json) = res.json::<Value>().await {
-                    if let Some(text) =
-                        json["candidates"][0]["content"]["parts"][0]["text"].as_str()
-                    {
-                        return text.to_string();
-                    }
-                }
-                "AI Parsing Error".to_string()
-            }
-            Err(e) => format!("AI Network Error: {}", e),
+            Ok(res) => res
+                .json::<Value>()
+                .await
+                .ok()
+                .and_then(|j| {
+                    j["candidates"][0]["content"]["parts"][0]["text"]
+                        .as_str()
+                        .map(|s| s.to_string())
+                })
+                .unwrap_or("AI Parse Error".to_string()),
+            Err(e) => format!("AI Error: {}", e),
         }
     }
 }
@@ -144,7 +133,7 @@ impl MutationRoot {
                 }
             }
         }
-        "Error updating field".to_string()
+        "Error".to_string()
     }
 
     async fn create_island(
@@ -164,21 +153,22 @@ impl MutationRoot {
                 return "Created".to_string();
             }
         }
-        "Error creating island".to_string()
+        "Error".to_string()
     }
 
     async fn resolve_action(&self, ctx: &Context<'_>, action_id: String, choice: String) -> String {
         let state = ctx.data::<ApiState>().expect("ApiState missing");
         match choice.as_str() {
-            "APPROVE" => match state.cloud.approve_pending_creation(&action_id) {
-                Ok(id) => format!("Created Entity: {}", id),
-                Err(e) => format!("Error approving: {}", e),
-            },
+            "APPROVE" => state
+                .cloud
+                .approve_pending_creation(&action_id)
+                .map(|id| format!("Created: {}", id))
+                .unwrap_or("Error".to_string()),
             "REJECT" => {
                 let _ = state.cloud.reject_pending_action(&action_id);
                 "Rejected".to_string()
             }
-            _ => "Unknown choice".to_string(),
+            _ => "Unknown".to_string(),
         }
     }
 }
@@ -200,7 +190,6 @@ async fn static_handler(uri: Uri) -> impl IntoResponse {
     if path.is_empty() {
         path = "index.html".to_string();
     }
-
     match Assets::get(&path) {
         Some(content) => {
             let mime = mime_guess::from_path(path).first_or_octet_stream();
@@ -217,7 +206,11 @@ async fn static_handler(uri: Uri) -> impl IntoResponse {
     }
 }
 
-pub async fn start_server(cloud: Arc<SqliteManager>, config: Arc<Config>) -> anyhow::Result<()> {
+pub async fn start_server(
+    cloud: Arc<SqliteManager>,
+    config: Arc<Config>,
+    mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
+) -> anyhow::Result<()> {
     let schema = Schema::build(QueryRoot, MutationRoot, EmptySubscription)
         .data(ApiState {
             cloud,
@@ -225,23 +218,31 @@ pub async fn start_server(cloud: Arc<SqliteManager>, config: Arc<Config>) -> any
         })
         .finish();
 
+    // FIX: Stronger CORS settings
     let cors = CorsLayer::new()
         .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_headers([header::CONTENT_TYPE, header::ACCEPT]);
+
     let app = Router::new()
         .route("/graphql", get(graphiql).post(graphql_handler))
         .fallback(static_handler)
         .layer(Extension(schema))
         .layer(cors);
 
-    // KEY CHANGE: Read port from config
     let port = config.global.port;
     let addr = format!("0.0.0.0:{}", port);
 
-    info!("🚀 API & Dashboard available at: http://localhost:{}", port);
+    info!("🚀 API available at: http://localhost:{}", port);
 
     let listener = TcpListener::bind(&addr).await?;
-    axum::serve(listener, app).await?;
+
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async move {
+            shutdown_rx.recv().await.ok();
+            info!("API shutting down for reload...");
+        })
+        .await?;
+
     Ok(())
 }

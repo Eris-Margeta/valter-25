@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { LayoutDashboard, Database, Folder, MessageSquare, Layers, RefreshCw } from 'lucide-react';
+import { LayoutDashboard, Database, Folder, MessageSquare, Layers, RefreshCw, AlertCircle } from 'lucide-react';
 import { graphqlRequest, QUERIES } from './api';
 import type { AppConfig, PendingAction } from './types';
 import { DynamicTable } from './components/DynamicTable';
@@ -13,13 +13,18 @@ function App() {
   const [oracleQ, setOracleQ] = useState('');
   const [oracleA, setOracleA] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null); // NOVO: Error state
 
   const init = async () => {
     try {
+      setErrorMsg(null);
       const cfgData = await graphqlRequest(QUERIES.GET_CONFIG);
       setConfig(cfgData.config);
       refreshActions();
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+      console.error(e);
+      setErrorMsg(String(e));
+    }
   };
 
   const refreshActions = async () => {
@@ -61,7 +66,19 @@ function App() {
     setLoading(false);
   };
 
-  if (!config) return <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center font-mono">INITIALIZING VALTER LINK...</div>;
+  // NOVO: Prikaz greške kod inicijalizacije
+  if (errorMsg) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-red-400 flex flex-col items-center justify-center font-mono p-8 text-center">
+        <AlertCircle className="w-12 h-12 mb-4" />
+        <h2 className="text-xl font-bold mb-2">CONNECTION FAILED</h2>
+        <p className="text-sm text-slate-500 mb-6 max-w-md">{errorMsg}</p>
+        <button onClick={() => window.location.reload()} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded transition-colors">Retry Connection</button>
+      </div>
+    );
+  }
+
+  if (!config) return <div className="min-h-screen bg-slate-900 text-emerald-500 flex items-center justify-center font-mono animate-pulse">INITIALIZING VALTER LINK...</div>;
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex font-sans">

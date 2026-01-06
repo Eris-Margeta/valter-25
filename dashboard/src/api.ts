@@ -1,29 +1,36 @@
-// Detektira jesmo li u Vite Dev modu
+// Detekcija okoline
 const isDev = import.meta.env.DEV;
 
-// U devu (Vite radi na 5173) moramo eksplicitno gađati Backend na 8000.
-// U produkciji (Rust servira i HTML i API), API je na istom hostu/portu, pa koristimo relativnu putanju.
-const API_URL = isDev ? 'http://localhost:8000/graphql' : '/graphql';
+// U Devu (Vite 5173) gađamo 8000.
+// U Prod (Rust 9090) koristimo relativni path (isti host/port).
+const BASE_URL = isDev ? 'http://localhost:8000' : '';
+const GRAPHQL_URL = `${BASE_URL}/graphql`;
+
+console.log(`[VALTER LINK] Mode: ${isDev ? 'DEV' : 'PROD'}`);
+console.log(`[VALTER LINK] Connecting to: ${GRAPHQL_URL}`);
 
 export async function graphqlRequest(query: string, variables: any = {}) {
   try {
-    const res = await fetch(API_URL, {
+    const res = await fetch(GRAPHQL_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query, variables })
     });
     
     if (!res.ok) {
-      throw new Error(`HTTP Error: ${res.status}`);
+      const txt = await res.text();
+      console.error("[VALTER LINK] HTTP Error:", res.status, txt);
+      throw new Error(`Server Error (${res.status})`);
     }
 
     const json = await res.json();
     if (json.errors) {
+      console.warn("[VALTER LINK] GraphQL Error:", json.errors);
       throw new Error(json.errors[0].message);
     }
     return json.data;
   } catch (e) {
-    console.error("API Call Failed:", e);
+    console.error("[VALTER LINK] Network/Parse Error:", e);
     throw e;
   }
 }

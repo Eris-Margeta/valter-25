@@ -1,0 +1,44 @@
+# ==========================================
+# VALTER PROJECT IDENTITY (The Island Root)
+# ==========================================
+
+# 1. CORE METADATA
+# Osnovni podaci koje Dashboard prikazuje u tablici.
+name: "VALTER ERP (Source)"
+description: "The Hyper-Converged Data Operating System. Local-First, AI-Native."
+status: "Active Development"
+version: "0.1.0"
+created_at: "2026-01-06"
+last_updated: "2026-01-06"
+
+# 2. RELATIONS (SQL Clouds)
+# Valter Daemon čita ovo i povezuje s tablicama 'Operator' i 'Client'.
+# Ako "Eris-Margeta" ne postoji u bazi, sustav će pauzirati i pitati te u Dashboardu.
+operator: "Eris-Margeta"
+client: "Open Source Community"
+
+# 3. INTERNAL DATA MAP
+# Iako 'valter.config' definira pravila skeniranja (Aggregations),
+# dobra je praksa ovdje dokumentirati strukturu za ljude i AI Oracle.
+structure:
+  work_orders: "./VALTER-INTERNAL/RADNI-NALOZI/"  # Ovdje se skupljaju .md taskovi
+  financials:  "./VALTER-INTERNAL/FINANCIJE/"     # (Planirano)
+  docs:        "./website/src/content/docs/"      # Dokumentacija projekta
+
+# 4. CONTEXT & TAGS
+# Ovo koristi AI (Oracle) kada ga pitaš "Što ovaj projekt koristi?"
+tech_stack:
+  backend: "Rust (Tokio, Axum, Rusqlite)"
+  frontend: "React 19 (Vite, Tailwind)"
+  web: "Astro"
+  database: "SQLite (Embedded)"
+
+tags:
+  - "ERP"
+  - "Local-First"
+  - "Monorepo"
+  - "System-Tool"
+
+# 5. LINKS
+repo: "https://github.com/Eris-Margeta/valter-25"
+license: "MIT"

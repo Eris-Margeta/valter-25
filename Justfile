@@ -6,25 +6,23 @@ default:
 
 # --- DEVELOPMENT ---
 
-# Run the full stack in Dev Mode (Monorepo root)
-# Pre-flight: Kill anything on ports 8000 (Backend) and 5173 (Vite Frontend)
-# Trap: Kill everything on exit
+# Run the full stack in Dev Mode with AUTO-CLEANUP
 dev:
     @echo "🧹 Pre-flight: Killing zombies on ports 8000 & 5173..."
     @-lsof -ti:8000 | xargs kill -9 2>/dev/null || true
     @-lsof -ti:5173 | xargs kill -9 2>/dev/null || true
     
-    @# Ensure dist folder exists for rust-embed
+    @# Ensure dist folder exists so rust-embed doesn't crash compilation
     @mkdir -p dashboard/dist && touch dashboard/dist/index.html
     
     @echo "🚀 Starting VALTER DEV Environment..."
-    @echo "   Backend: http://localhost:8000"
-    @echo "   Frontend: http://localhost:5173"
+    @echo "   Backend API: http://localhost:8000/graphql"
+    @echo "   Frontend UI: http://localhost:5173"
     
-    @# Run backend and frontend in background, trap SIGINT to clean up
+    @# Trap SIGINT (Ctrl+C) to run cleanup
     @trap 'echo "\n🛑 Shutting down..."; lsof -ti:8000 | xargs kill -9 2>/dev/null; lsof -ti:5173 | xargs kill -9 2>/dev/null; exit 0' SIGINT; \
     (cd core && cargo run -- run) & \
-    (cd dashboard && pnpm dev) & \
+    (cd dashboard && pnpm install && pnpm dev) & \
     wait
 
 clean:
@@ -41,9 +39,8 @@ release version:
     @if [ -n "$(git status --porcelain)" ]; then echo "❌ Error: Git is dirty. Commit changes first."; exit 1; fi
     @echo "📦 Building Frontend for Release..."
     cd dashboard && pnpm install && pnpm build
-    @echo "🏷️  Tagging version {{version}}..."
+    @echo "🏷️  Tagging & Pushing..."
     git tag -a {{version}} -m "Release {{version}}"
-    @echo "⬆️  Pushing tag to GitHub..."
     git push origin {{version}}
     @echo "✅ Done! GitHub Actions will now build and publish the release."
 
