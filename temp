@@ -1,0 +1,276 @@
+Odlično! Projekt izgleda strukturirano, čisto i spremno za profesionalnu fazu. Čestitam na objavi repozitorija!
+
+Pregledao sam stablo datoteka. Imamo **Core** (Rust), **Dashboard** (React), **Website** (Astro), **Justfile** i svu dokumentaciju.
+
+Ono što **nedostaje** da bi ovo bio "Top-Tier" GitHub projekt su:
+1.  **CI/CD Pipeline (.github/workflows):** Automatizirano testiranje i buildanje binarnih datoteka za Release.
+2.  **Community Health Files:** `CONTRIBUTING.md` i Issue Templates.
+3.  **Astro Rendering Logic:** Imamo skriptu za sinkronizaciju (`sync-docs.js`), ali nemamo Astro stranicu koja te Markdown fajlove zapravo prikazuje.
+
+Idemo to riješiti korak po korak.
+
+---
+
+### KORAK 1: GitHub Actions (Automatski Testovi)
+
+Kreiraj mapu `.github/workflows` u rootu.
+Prvi fajl je `ci.yml`. On se pokreće na svaki `push` i osigurava da nisi slomio kod.
+
+**File:** `.github/workflows/ci.yml`
+
+```yaml
+name: CI
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test-core:
+    name: Test Core (Rust)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache Cargo
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            core/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Check
+        run: cd core && cargo check
+      - name: Test
+        run: cd core && cargo test
+
+  build-dashboard:
+    name: Build Dashboard (React)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'pnpm'
+          cache-dependency-path: 'dashboard/pnpm-lock.yaml'
+      - name: Install Dependencies
+        run: cd dashboard && pnpm install
+      - name: Build
+        run: cd dashboard && pnpm build
+```
+
+---
+
+### KORAK 2: Release Pipeline (Buildanje Binarki)
+
+Ovo je "The Big One". Kada kreiraš novi Release na GitHubu (npr. `v0.1.0`), ova akcija će se pokrenuti, kompajlirati Valter za Linux, Windows i Mac, i automatski uploadati te fajlove na Release page.
+
+**File:** `.github/workflows/release.yml`
+
+```yaml
+name: Release
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+
+  build-assets:
+    name: Build Release Assets
+    needs: create-release
+    runs-on: ${{ matrix.config.os }}
+    strategy:
+      matrix:
+        config:
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu, suffix: "" }
+          - { os: macos-latest, target: x86_64-apple-darwin, suffix: "" }
+          - { os: macos-latest, target: aarch64-apple-darwin, suffix: "" } # M1/M2 Mac
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, suffix: ".exe" }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.config.target }}
+
+      - name: Build Release
+        run: cd core && cargo build --release --target ${{ matrix.config.target }}
+
+      - name: Package Asset
+        shell: bash
+        run: |
+          cd core/target/${{ matrix.config.target }}/release
+          
+          # Rename binary to generic name for packaging
+          cp valter${{ matrix.config.suffix }} ../../../valter-${{ matrix.config.target }}${{ matrix.config.suffix }}
+          cd ../../..
+          
+          # Upload directly to release
+      
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: core/valter-${{ matrix.config.target }}${{ matrix.config.suffix }}
+```
+
+---
+
+### KORAK 3: Astro Rendering (Website)
+
+Imamo `sync-docs.js` koji kopira `README.md` u `website/src/content/docs/index.md`. Ali Astro treba layout da to prikaže.
+
+**1. Instaliraj Astro Tailwind (ako već nisi):**
+(Unutar `website/` foldera)
+```bash
+pnpm astro add tailwind
+```
+
+**2. Kreiraj Layout:** `website/src/layouts/Layout.astro`
+```astro
+---
+interface Props {
+	title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="description" content="Valter ERP Documentation" />
+		<meta name="viewport" content="width=device-width" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<title>{title}</title>
+	</head>
+	<body class="bg-slate-900 text-slate-200 font-sans">
+		<div class="max-w-4xl mx-auto px-6 py-12">
+            <header class="mb-12 border-b border-slate-800 pb-6 flex justify-between items-center">
+                <h1 class="text-3xl font-bold text-emerald-400">VALTER ERP</h1>
+                <nav class="space-x-4">
+                    <a href="/" class="hover:text-white">Home</a>
+                    <a href="/roadmap" class="hover:text-white">Roadmap</a>
+                    <a href="https://github.com/Eris-Margeta/valter-25" class="hover:text-white">GitHub</a>
+                </nav>
+            </header>
+			<slot />
+		</div>
+	</body>
+</html>
+```
+
+**3. Kreiraj Dynamic Page za Dokumentaciju:** `website/src/pages/[...slug].astro`
+Ovo je magija. Ovo će uhvatiti *sve* markdown fajlove koje je `sync-docs.js` kopirao i pretvoriti ih u HTML.
+
+```astro
+---
+import { getCollection } from 'astro:content';
+import Layout from '../layouts/Layout.astro';
+
+export async function getStaticPaths() {
+  // Ovdje učitavamo 'docs' kolekciju koju puni tvoja sync skripta
+  const blogEntries = await getCollection('docs');
+  return blogEntries.map(entry => ({
+    params: { slug: entry.slug }, props: { entry },
+  }));
+}
+
+const { entry } = Astro.props;
+const { Content } = await entry.render();
+---
+
+<Layout title={entry.data.title}>
+    <article class="prose prose-invert prose-emerald max-w-none">
+        <h1>{entry.data.title}</h1>
+        <Content />
+    </article>
+</Layout>
+```
+
+**4. Definiraj Kolekciju:** `website/src/content/config.ts`
+```typescript
+import { defineCollection, z } from 'astro:content';
+
+const docsCollection = defineCollection({
+  type: 'content',
+  schema: z.object({
+    title: z.string(),
+    // Ostala polja su opcionalna
+  }),
+});
+
+export const collections = {
+  'docs': docsCollection,
+};
+```
+
+---
+
+### KORAK 4: Community Files
+
+U rootu projekta:
+
+**`CONTRIBUTING.md`**
+```markdown
+# Contributing to VALTER
+
+Thank you for your interest in building the future of Data Operating Systems!
+
+## Getting Started
+1. Fork the repo.
+2. Run `just dev` to start the Monorepo environment.
+3. Make your changes in `core/` (Rust) or `dashboard/` (React).
+
+## Pull Requests
+- Please follow the existing code style.
+- Ensure `cargo test` passes.
+- Update documentation if you change configuration options.
+```
+
+---
+
+### ZADATAK ZA TEBE
+
+1.  **Kopiraj** ove YAML konfiguracije u `.github/workflows/`.
+2.  **Postavi** Astro stranice kako je navedeno u Koraku 3.
+3.  **Pushaj** sve na GitHub.
+4.  **Testiraj Release:**
+    *   Otiđi na GitHub -> Releases -> Draft a new release.
+    *   Stavi tag `v0.1.0`.
+    *   Klikni "Publish release".
+    *   Gledaj "Actions" tab kako tvoji serveri rade i izbacuju binarne datoteke!
+
+Nakon ovoga, Valter je **službeno živ** i spreman za distribuciju.

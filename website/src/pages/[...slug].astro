@@ -1,0 +1,23 @@
+---
+import { getCollection } from 'astro:content';
+import Layout from '../layouts/Layout.astro';
+
+export async function getStaticPaths() {
+  // Ovdje učitavamo 'docs' kolekciju koju puni tvoja sync skripta
+  const blogEntries = await getCollection('docs');
+  return blogEntries.map(entry => ({
+    params: { slug: entry.slug }, props: { entry },
+  }));
+}
+
+const { entry } = Astro.props;
+const { Content } = await entry.render();
+---
+
+<Layout title={entry.data.title}>
+    <article class="prose prose-invert prose-emerald max-w-none">
+        <h1>{entry.data.title}</h1>
+        <Content />
+    </article>
+</Layout>
+
