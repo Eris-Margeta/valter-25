@@ -8,18 +8,22 @@ default:
 # --- DEVELOPMENT ---
 
 # Run the full stack in Dev Mode (Monorepo root)
+# Uses a single shell block to manage background processes and trapping signals.
 dev:
     @echo "🧹 Pre-flight: Killing zombies on ports 8000 & 5173..."
     @-lsof -ti:8000 | xargs kill -9 2>/dev/null || true
     @-lsof -ti:5173 | xargs kill -9 2>/dev/null || true
     @echo "🚀 Starting VALTER DEV Environment..."
+    @echo "   Backend: http://localhost:8000"
+    @echo "   Frontend: http://localhost:5173"
     @# Trap SIGINT (Ctrl+C) to run cleanup
+    @# Note: We use '&' to background backend and frontend, then 'wait' to keep the script running.
     @trap 'echo "\n🛑 Shutting down..."; lsof -ti:8000 | xargs kill -9 2>/dev/null; lsof -ti:5173 | xargs kill -9 2>/dev/null; exit 0' SIGINT; \
     (cd core && cargo run -- run) & \
-    (cd dashboard && pnpm dev)
-    @echo "Dashboard running on http://localhost:5173/"
+    (cd dashboard && pnpm dev) & \
     wait
 
+# Clean build artifacts and temporary files
 clean:
     @echo "🧹 Cleaning up..."
     rm -rf target core/target
@@ -57,7 +61,7 @@ install:
     mkdir -p ~/.local/bin
     
     @echo "🚚 Installing Binary..."
-    # FIX: Workspace puts artifacts in root target/release
+    # Copy from the root target/release folder (Workspace standard)
     cp target/release/valter ~/.local/bin/valter
     
     @echo "📝 Installing Default Config..."
@@ -82,3 +86,4 @@ update:
 check-migrations:
     @echo "🔍 Checking migrations..."
     @echo "Note: Currently Valter applies migrations automatically on startup."
+

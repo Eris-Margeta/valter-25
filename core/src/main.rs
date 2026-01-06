@@ -60,12 +60,13 @@ async fn main() -> Result<()> {
     let env_valter_home = env::var("VALTER_HOME").ok().map(PathBuf::from);
 
     // Određujemo stvarni home za trenutni proces
+    // Koristimo .clone() jer nam env_valter_home treba kasnije
     let current_home = env_valter_home.clone().unwrap_or_else(|| PathBuf::from("."));
     
     // PID file lokacija
-    let pid_file_path = if env_valter_home.is_some() {
-        // Ako je forsiran system mode, pid je tamo
-        env_valter_home.unwrap().join("valter.pid")
+    let pid_file_path = if let Some(ref path) = env_valter_home {
+        // FIX: Koristimo 'ref path' da ne potrošimo varijablu
+        path.join("valter.pid")
     } else if current_home.join("valter.dev.config").exists() {
         // Dev mode root
         PathBuf::from("valter.pid")
@@ -82,8 +83,7 @@ async fn main() -> Result<()> {
             println!("🚀 Initializing Valter Daemon...");
             
             // FORSIRAMO PRODUKCIJU:
-            // Ako korisnik nije eksplicitno postavio VALTER_HOME,
-            // mi ga postavljamo na ~/.valter za child proces.
+            // Ovdje trošimo env_valter_home (unwrap_or), što je OK jer je ovo zadnje korištenje
             let target_home = env_valter_home.unwrap_or(default_system_home);
             
             // Osiguraj da folder postoji
@@ -136,7 +136,7 @@ async fn main() -> Result<()> {
     info!("   Open Source Edition (MIT)");
     info!("---------------------------------------------");
 
-    // Ponovno evaluiramo mode jer nas je možda Start komanda pozvala s novim ENV
+    // Ponovno dohvaćamo ENV jer smo u 'run' bloku (možda u child procesu)
     let valter_home = env::var("VALTER_HOME").unwrap_or_else(|_| ".".to_string());
     let home_path = PathBuf::from(&valter_home);
     let is_system_mode = valter_home != ".";
@@ -208,10 +208,6 @@ async fn main() -> Result<()> {
     let processor = EventProcessor::new(cloud.clone(), config.clone());
     
     let watch_root = if is_system_mode {
-        // U produkciji ne želimo nužno gledati home folder osim ako config ne kaže drugačije.
-        // Ali za sada, neka gleda home jer tamo može biti config.
-        // Još bolje: Gledajmo ono što piše u configu.
-        // Ali Watcher mora imati root path.
         valter_home.clone()
     } else if config_path.starts_with("..") {
         "..".to_string()

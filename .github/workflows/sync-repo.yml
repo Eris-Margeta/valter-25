@@ -1,0 +1,52 @@
+name: Repo Sync & Ops
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    paths:
+      - 'README.md'
+      - 'valter.dev.config'
+      - 'VALTER-INTERNAL/RADNI-NALOZI/**'
+
+jobs:
+  # 1. Sinkronizacija Metadataka (Opis, Homepage)
+  sync-metadata:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Update Repo Info
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 1. Izvuci opis iz README-a (Prvi paragraf nakon naslova)
+          # Ovo je jednostavna bash logika, može se pojačati
+          DESCRIPTION=$(grep -A 2 "# VALTER ERP" README.md | tail -n 1)
+          
+          # 2. Homepage URL
+          HOMEPAGE="https://valter.erp" # Ili izvuci iz configa
+          
+          # 3. Ažuriraj GitHub putem CLI-a
+          echo "Updating description to: $DESCRIPTION"
+          gh repo edit --description "$DESCRIPTION" --homepage "$HOMEPAGE" --enable-issues=true --enable-projects=true
+
+  # 2. Sinkronizacija Radnih Naloga (Issues)
+  # Ovo koristi 'todo-to-issue-action'.
+  # On traži "TODO" u kodu, ali možemo ga konfigurirati da gleda i Markdown fajlove.
+  sync-issues:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Convert TODOs to Issues
+        uses: alstr/todo-to-issue-action@v4
+        with:
+          # Skeniraj cijeli repo
+          INSERT_ISSUE_URLS: "true"
+          CLOSE_ISSUES: "true" # Ako obrišeš TODO, zatvara Issue
+          AUTO_ASSIGN: "true"

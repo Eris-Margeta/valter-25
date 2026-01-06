@@ -17,7 +17,7 @@ Before running Valter, ensure your system has the following installed:
 | Tool | Version | Purpose |
 |------|---------|---------|
 | **Rust** | `stable` (1.75+) | Compiling the Core Daemon. |
-| **Node.js** | `v18+` | Running the Dashboard & Website. |
+| **Node.js** | `v24+` | Running the Dashboard & Website. |
 | **pnpm** | `latest` | Package manager for frontend. |
 | **Just** | `latest` | Command runner (replaces Make/Shell scripts). |
 
