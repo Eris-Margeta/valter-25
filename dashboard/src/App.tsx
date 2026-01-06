@@ -1,6 +1,7 @@
+[FILE_CONTENT_START ID="F084" PATH="dashboard/src/App.tsx"]
 import { useState, useEffect, useCallback } from 'react';
-import { LayoutDashboard, Database, Folder, MessageSquare, Layers, RefreshCw, AlertCircle } from 'lucide-react';
-import { graphqlRequest, QUERIES } from './api';
+import { LayoutDashboard, Database, Folder, MessageSquare, Layers, RefreshCw, AlertCircle, RotateCcw } from 'lucide-react';
+import { graphqlRequest, QUERIES, MUTATIONS } from './api';
 import type { AppConfig, PendingAction } from './types';
 import { DynamicTable } from './components/DynamicTable';
 import { ActionCenter } from './components/ActionCenter';
@@ -13,7 +14,7 @@ function App() {
   const [oracleQ, setOracleQ] = useState('');
   const [oracleA, setOracleA] = useState('');
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null); // NOVO: Error state
+  const [errorMsg, setErrorMsg] = useState<string | null>(null); 
 
   const init = async () => {
     try {
@@ -33,6 +34,22 @@ function App() {
       setPendingActions(actionsData.pendingActions);
     } catch (e) { console.error(e); }
   }
+
+  const handleRescan = async () => {
+    setLoading(true);
+    try {
+        await graphqlRequest(MUTATIONS.RESCAN_ISLANDS);
+        // Wait a sec for backend to process
+        setTimeout(async () => {
+            await refreshActions();
+            await fetchData();
+            setLoading(false);
+        }, 1000);
+    } catch (e) {
+        alert("Rescan failed: " + e);
+        setLoading(false);
+    }
+  };
 
   const fetchData = useCallback(async () => {
     if (!config) return;
@@ -66,7 +83,6 @@ function App() {
     setLoading(false);
   };
 
-  // NOVO: Prikaz greške kod inicijalizacije
   if (errorMsg) {
     return (
       <div className="min-h-screen bg-slate-950 text-red-400 flex flex-col items-center justify-center font-mono p-8 text-center">
@@ -119,6 +135,14 @@ function App() {
         <header className="h-16 border-b border-slate-800 flex items-center justify-between px-8 bg-slate-900">
           <h1 className="text-xl font-semibold tracking-tight">{activeView.type === 'dashboard' ? 'Overview' : activeView.name}</h1>
           <div className="flex items-center gap-4">
+            <button 
+                onClick={handleRescan} 
+                className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 rounded border border-slate-700 transition-colors"
+                title="Force Rescan of Filesystem"
+            >
+                <RotateCcw size={12} className={loading ? "animate-spin" : ""} />
+                RESCAN SYSTEM
+            </button>
             {loading && <RefreshCw className="w-4 h-4 animate-spin text-emerald-500" />}
             <div className="h-8 px-3 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center font-bold text-xs text-emerald-400">
               ORACLE ACTIVE
@@ -157,4 +181,4 @@ function App() {
   );
 }
 export default App;
-
+[FILE_CONTENT_END ID="F084"]

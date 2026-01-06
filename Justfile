@@ -20,8 +20,9 @@ dev:
     @echo "   Frontend UI: http://localhost:5173"
     
     @# Trap SIGINT (Ctrl+C) to run cleanup
+    @# CHANGE: We run cargo via --manifest-path to keep CWD at repo root
     @trap 'echo "\n🛑 Shutting down..."; lsof -ti:8000 | xargs kill -9 2>/dev/null; lsof -ti:5173 | xargs kill -9 2>/dev/null; exit 0' SIGINT; \
-    export VALTER_HOME=$(pwd) && cd core && cargo run -- run & \
+    (cargo run --manifest-path core/Cargo.toml -- run) & \
     (cd dashboard && pnpm install && pnpm dev) & \
     wait
 

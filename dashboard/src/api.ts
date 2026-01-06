@@ -64,6 +64,12 @@ export const QUERIES = {
 };
 
 export const MUTATIONS = {
+  // NEW: Rescan mutation
+  RESCAN_ISLANDS: `
+    mutation {
+      rescanIslands
+    }
+  `,
   RESOLVE_ACTION: `
     mutation($id: String!, $choice: String!) {
       resolveAction(actionId: $id, choice: $choice)
@@ -75,4 +81,3 @@ export const MUTATIONS = {
     }
   `
 };
-

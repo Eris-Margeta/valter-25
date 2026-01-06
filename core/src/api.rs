@@ -218,7 +218,6 @@ pub async fn start_server(
         })
         .finish();
 
-    // FIX: Stronger CORS settings
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])

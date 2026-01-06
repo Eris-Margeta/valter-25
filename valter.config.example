@@ -1,38 +1,15 @@
-# VALTER CONFIGURATION TEMPLATE
+# VALTER CONFIGURATION TEMPLATE (PRODUCTION)
 # ---------------------------------------------------------
-# HOW TO USE THIS FILE:
-#
-# 1. FOR SYSTEM INSTALLATION (~/.valter):
-#    Rename this file to 'valter.config'.
-#    Place it in your VALTER_HOME (usually ~/.valter/).
-#    This config will be used when you run 'valter' globally.
-#
-# 2. FOR LOCAL DEVELOPMENT (MONOREPO):
-#    Do NOT use this file directly if you are contributing to Valter.
-#    The repository uses 'valter.dev.config' which is already set up
-#    to scan the 'dev-projects-folder'.
-# ---------------------------------------------------------
-
-# VALTER CONFIGURATION TEMPLATE
-# ---------------------------------------------------------
-# HOW TO USE THIS FILE:
-#
-# 1. FOR SYSTEM INSTALLATION (~/.valter):
-#    Rename this file to 'valter.config'.
-#    Place it in your VALTER_HOME (usually ~/.valter/).
-#    This config will be used when you run 'valter' globally.
-#
-# 2. FOR LOCAL DEVELOPMENT (MONOREPO):
-#    Do NOT use this file directly if you are contributing to Valter.
-#    The repository uses 'valter.dev.config' which is already set up
-#    to scan the 'dev-projects-folder'.
+# 1. INSTALLATION:
+#    This file is copied to ~/.valter/valter.config
+#    Edit 'root_path' below to point to your real data.
 # ---------------------------------------------------------
 
 GLOBAL:
-  company_name: "TEJL"
+  company_name: "My Company"
   currency_symbol: "€"
-  locale: "hr_HR"
-  port: 9090 # <--- PRODUCTION PORT (Different from Dev)
+  locale: "en_US"
+  port: 9090
 
 CLOUDS:
   - name: "Operator"
@@ -51,12 +28,17 @@ CLOUDS:
 
 ISLANDS:
   - name: "Project"
-    root_path: "/Users/kovachevich/DEV/*"  
+    # CHANGE THIS TO YOUR ACTUAL DATA FOLDER
+    # Example: "/Users/username/Documents/Projects/*"
+    root_path: "/PATH/TO/YOUR/DATA/*"  
     meta_file: "meta.yaml" 
     relations:
       - field: "operator"
         target_cloud: "Operator"
       - field: "client"
         target_cloud: "Client"
-
-
+    aggregations:
+      - name: "total_tasks"
+        path: "INTERNAL/WorkOrders/*.md"
+        target_field: "id"
+        logic: "count"

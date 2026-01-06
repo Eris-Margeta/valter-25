@@ -5,7 +5,7 @@ use serde_json::{Map, Value as JsonValue};
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 use strsim::levenshtein;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 use uuid::Uuid;
 
 #[allow(dead_code)]
@@ -25,14 +25,11 @@ impl SqliteManager {
     pub fn new(path: &str) -> Result<Self> {
         let conn = Connection::open(path).context("Failed to open SQLite DB")?;
 
-        // FIX: PRAGMA journal_mode returns a row ("wal"), so execute() fails.
-        // We use query_row to consume that result.
+        // PRAGMA journal_mode=WAL is excellent for concurrency
         let _: String = conn
             .query_row("PRAGMA journal_mode=WAL", [], |row| row.get(0))
             .unwrap_or("delete".to_string());
 
-        // synchronous=NORMAL doesn't return rows usually, but let's be safe via execute is fine usually,
-        // but strictly speaking some pragmas do return. synchronous usually doesn't.
         conn.execute("PRAGMA synchronous=NORMAL", [])?;
 
         Ok(Self {
@@ -43,12 +40,11 @@ impl SqliteManager {
     pub fn init_schema(&self, config: &Config) -> Result<()> {
         let conn = self.conn.lock().unwrap();
 
-        // 0. SYSTEM METADATA (Versioning)
+        // 0. SYSTEM METADATA
         conn.execute(
             "CREATE TABLE IF NOT EXISTS _valter_system (key TEXT PRIMARY KEY, value TEXT)",
             [],
         )?;
-        // Zapisujemo trenutnu verziju schema engine-a
         conn.execute(
             "INSERT OR REPLACE INTO _valter_system (key, value) VALUES ('schema_version', '1')",
             [],
@@ -63,11 +59,6 @@ impl SqliteManager {
         for island_def in &config.islands {
             let mut virtual_fields = Vec::new();
 
-            // Standard fields for every island
-            // Note: We handle these manually inside ensure_table logic or define them here implicitly?
-            // Let's create a definition for ensure_table to use.
-
-            // Relations -> Text Columns
             for rel in &island_def.relations {
                 virtual_fields.push(crate::config::CloudField {
                     key: rel.field.clone(),
@@ -76,7 +67,6 @@ impl SqliteManager {
                     options: None,
                 });
             }
-            // Aggregations -> Number Columns
             for agg in &island_def.aggregations {
                 virtual_fields.push(crate::config::CloudField {
                     key: agg.name.clone(),
@@ -108,7 +98,35 @@ impl SqliteManager {
         Ok(())
     }
 
-    // Helper za pametnu migraciju (CREATE or ALTER)
+    /// PURGE ISLANDS: Briše sve zapise iz tablice otoka.
+    /// Ovo koristimo kod Rescana da osiguramo da je SQL baza 1-na-1 sa Filesystemom.
+    pub fn purge_islands(&self, table_name: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        // Provjera postoji li tablica prije brisanja
+        let exists: bool = conn
+            .query_row(
+                "SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?",
+                params![table_name],
+                |row| row.get(0),
+            )
+            .unwrap_or(0)
+            > 0;
+
+        if exists {
+            conn.execute(&format!("DELETE FROM {}", table_name), [])?;
+            info!("🧹 Purged all data from Island table: {}", table_name);
+        }
+        Ok(())
+    }
+
+    /// RESET PENDING: Briše sve akcije kako bi se ponovno generirale kod skeniranja.
+    pub fn reset_pending_actions(&self) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM pending_actions", [])?;
+        info!("🧹 Purged all Pending Actions (Notifications reset).");
+        Ok(())
+    }
+
     fn ensure_table(
         &self,
         conn: &Connection,
@@ -116,7 +134,6 @@ impl SqliteManager {
         fields: &[crate::config::CloudField],
         is_island: bool,
     ) -> Result<()> {
-        // 1. Base columns
         let mut expected_cols = HashMap::new();
         expected_cols.insert("id".to_string(), "TEXT PRIMARY KEY".to_string());
 
@@ -136,7 +153,6 @@ impl SqliteManager {
             expected_cols.insert(field.key.clone(), sql_type.to_string());
         }
 
-        // 2. Check if table exists
         let table_exists: bool = conn
             .query_row(
                 "SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?",
@@ -147,7 +163,6 @@ impl SqliteManager {
             > 0;
 
         if !table_exists {
-            // Create Table
             let mut cols_def = Vec::new();
             for (col, type_def) in &expected_cols {
                 cols_def.push(format!("{} {}", col, type_def));
@@ -156,7 +171,6 @@ impl SqliteManager {
             info!("Database: Creating table '{}'", table_name);
             conn.execute(&query, [])?;
         } else {
-            // Migrate (Check missing columns)
             let mut stmt = conn.prepare(&format!("PRAGMA table_info({})", table_name))?;
             let existing_cols: HashSet<String> = stmt
                 .query_map([], |row| row.get::<_, String>(1))?
@@ -165,10 +179,7 @@ impl SqliteManager {
 
             for (col, type_def) in &expected_cols {
                 if !existing_cols.contains(col) {
-                    // ALTER TABLE ADD COLUMN
-                    // Note: SQLite allows adding columns but primary keys/not nulls have restrictions.
-                    // We assume nullable or default for new columns to be safe.
-                    let clean_type = type_def.replace("PRIMARY KEY", ""); // Can't add PK via Alter
+                    let clean_type = type_def.replace("PRIMARY KEY", "");
                     let query = format!(
                         "ALTER TABLE {} ADD COLUMN {} {}",
                         table_name, col, clean_type
@@ -195,6 +206,7 @@ impl SqliteManager {
     ) -> Result<EntityStatus> {
         let conn = self.conn.lock().unwrap();
 
+        // 1. Check Exact Match
         let query_exact = format!("SELECT id FROM {} WHERE {} = ?", table, key_field);
         {
             let mut stmt = conn.prepare(&query_exact)?;
@@ -204,6 +216,10 @@ impl SqliteManager {
             }
         }
 
+        // 2. Check if already Pending (Ignore status for now, we just check existence)
+        // Zapravo, želimo vratiti pending samo ako je 'Pending'. Ako je 'Rejected', želimo ga ponovno prikazati?
+        // User je tražio "RESCAN" koji resetira stvari.
+        // Ovdje provjeravamo samo 'Pending' status.
         let query_pending = "SELECT id FROM pending_actions WHERE target_table = ? AND value = ? AND status = 'Pending'";
         {
             let mut stmt = conn.prepare(query_pending)?;
@@ -213,8 +229,8 @@ impl SqliteManager {
             }
         }
 
+        // 3. Create Suggestions & New Action
         let mut suggestions = Vec::new();
-        // Catch error if table/column doesn't exist yet (safety check)
         if let Ok(mut stmt) = conn.prepare(&format!("SELECT {} FROM {}", key_field, table)) {
             let names_iter = stmt.query_map([], |row| row.get::<_, String>(0))?;
             for name_res in names_iter {
@@ -310,6 +326,7 @@ impl SqliteManager {
     ) -> Result<()> {
         let conn = self.conn.lock().unwrap();
 
+        // Check ID
         let query_select = format!("SELECT id FROM {} WHERE name = ?", table);
         let project_id: String = {
             let mut stmt = conn.prepare(&query_select)?;
@@ -321,6 +338,7 @@ impl SqliteManager {
             }
         };
 
+        // Delete old entry to ensure clean upsert (simpler than UPDATE for dynamic fields)
         conn.execute(
             &format!("DELETE FROM {} WHERE id = ?", table),
             params![project_id],
@@ -364,7 +382,6 @@ impl SqliteManager {
 
     pub fn fetch_pending_actions(&self) -> Result<Vec<JsonValue>> {
         let conn = self.conn.lock().unwrap();
-        // Možda tablica ne postoji pri prvom runu ako config nije učitan, pa handle gracefully
         let mut stmt = match conn.prepare("SELECT * FROM pending_actions WHERE status = 'Pending'")
         {
             Ok(s) => s,
@@ -407,7 +424,6 @@ impl SqliteManager {
         let conn = self.conn.lock().unwrap();
         let query = format!("SELECT * FROM {}", table);
 
-        // Handle case where table doesn't exist yet
         let mut stmt = match conn.prepare(&query) {
             Ok(s) => s,
             Err(_) => return Ok(vec![]),

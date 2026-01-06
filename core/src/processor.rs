@@ -1,6 +1,7 @@
 use crate::aggregator::Aggregator;
 use crate::cloud::{EntityStatus, SqliteManager};
-use crate::config::Config;
+use crate::config::{Config, IslandDefinition};
+use glob::Pattern;
 use notify::Event;
 use serde_json::json;
 use serde_yaml::Value;
@@ -8,7 +9,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 use walkdir::WalkDir;
 
 pub struct EventProcessor {
@@ -21,61 +22,109 @@ impl EventProcessor {
         Self { cloud, config }
     }
 
-    pub fn scan_existing_metadata(&self, root_path: &str) {
-        // Podržavamo i relativne putanje s '..'
-        info!("Scanning existing islands in: {}", root_path);
-        for entry in WalkDir::new(root_path).into_iter().filter_map(|e| e.ok()) {
-            // FIX: Fleksibilnije prepoznavanje meta fajla (podržavamo i naš proprietary)
-            if let Some(fname) = entry.file_name().to_str() {
-                if fname == "meta.yaml" || fname == "valter.proprietary.yaml" {
-                    if let Err(e) = self.process_metadata(entry.path()) {
-                        error!("Failed to process {:?}: {}", entry.path(), e);
+    /// Skenira sve definirane lokacije iz Configa prilikom pokretanja
+    pub fn scan_on_startup(&self) {
+        info!("🔍 Initial Scan: Starting...");
+        for island_def in &self.config.islands {
+            // Uklanjamo wildcard (*) da dobijemo base path
+            let base_path_str = island_def.root_path.replace("*", "");
+            let base_path = Path::new(&base_path_str);
+
+            if !base_path.exists() {
+                warn!(
+                    "⚠️  Path not found: {:?} (Skipping scan for '{}')",
+                    base_path, island_def.name
+                );
+                continue;
+            }
+
+            info!(
+                "📂 Scanning Island Type '{}' in: {:?}",
+                island_def.name, base_path
+            );
+
+            for entry in WalkDir::new(base_path).into_iter().filter_map(|e| e.ok()) {
+                if let Some(fname) = entry.file_name().to_str() {
+                    // Provjeravamo odgovara li ime fajla definiciji (npr. meta.yaml)
+                    if fname == island_def.meta_file {
+                        if let Err(e) = self.process_metadata(entry.path(), island_def) {
+                            error!("❌ Failed to process {:?}: {}", entry.path(), e);
+                        }
                     }
                 }
             }
         }
+        info!("✅ Initial Scan Complete.");
     }
 
     pub async fn handle_event(&self, event: Event) {
         for path in event.paths {
-            if let Some(file_name) = path.file_name().and_then(|f| f.to_str()) {
-                // FIX: Podrška za oba imena
-                if file_name == "meta.yaml" || file_name == "valter.proprietary.yaml" {
-                    info!("Metadata Change: {:?}", path);
-                    let _ = self.process_metadata(&path);
-                } else if path
-                    .extension()
-                    .map_or(false, |ext| ext == "yaml" || ext == "md")
-                {
-                    // Trigger deep scan if sub-files change
-                    let mut current = path.parent();
-                    while let Some(dir) = current {
-                        let meta_path_1 = dir.join("meta.yaml");
-                        let meta_path_2 = dir.join("valter.proprietary.yaml");
-
-                        if meta_path_1.exists() {
-                            info!("Deep scan triggered for project at {:?}", dir);
-                            let _ = self.process_metadata(&meta_path_1);
-                            break;
-                        } else if meta_path_2.exists() {
-                            info!("Deep scan triggered for project at {:?}", dir);
-                            let _ = self.process_metadata(&meta_path_2);
-                            break;
-                        }
-                        current = dir.parent();
+            // 1. Pokušaj naći Island Definiciju koja odgovara ovom fajlu
+            if let Some(island_def) = self.find_matching_island_def(&path) {
+                info!(
+                    "⚡ Metadata Change Detected: {:?} (Type: {})",
+                    path, island_def.name
+                );
+                let _ = self.process_metadata(&path, island_def);
+            }
+            // 2. Ako nije meta fajl, možda je sub-file (retrigger deep scan)
+            else if path
+                .extension()
+                .map_or(false, |ext| ext == "yaml" || ext == "md" || ext == "txt")
+            {
+                // Penjemo se gore dok ne nađemo meta fajl koji definira Island
+                let mut current = path.parent();
+                while let Some(dir) = current {
+                    // Provjeri ima li ovaj folder ikakav meta fajl definiran u configu
+                    if let Some(parent_def) = self.find_active_meta_in_dir(dir) {
+                        info!("🔄 Deep scan triggered by sub-file change in {:?}", dir);
+                        let meta_path = dir.join(&parent_def.meta_file);
+                        let _ = self.process_metadata(&meta_path, parent_def);
+                        break;
                     }
+                    current = dir.parent();
                 }
             }
         }
     }
 
-    fn process_metadata(&self, path: &Path) -> anyhow::Result<()> {
+    /// Pomoćna funkcija: Nalazi definiciju na temelju imena fajla i putanje
+    fn find_matching_island_def<'a>(&'a self, path: &Path) -> Option<&'a IslandDefinition> {
+        let file_name = path.file_name()?.to_str()?;
+
+        for island in &self.config.islands {
+            if island.meta_file == file_name {
+                // Provjera putanje (Jako bitno da ne miješamo tipove ako imaju isto ime meta fajla)
+                // Jednostavna provjera: Da li putanja fajla počinje s root pathom islanda?
+                // Moramo maknuti glob charove.
+                let root_clean = island.root_path.replace("*", "").replace("./", "");
+                // Oprez: Canonicalization bi bilo idealno, ali za sada string match:
+                let path_str = path.to_string_lossy();
+
+                // Hack za dev environment gdje su pathovi relativni vs apsolutni
+                if path_str.contains(&root_clean) {
+                    return Some(island);
+                }
+            }
+        }
+        None
+    }
+
+    /// Pomoćna funkcija: Provjerava postoji li validan meta fajl u direktoriju
+    fn find_active_meta_in_dir<'a>(&'a self, dir: &Path) -> Option<&'a IslandDefinition> {
+        for island in &self.config.islands {
+            let candidate = dir.join(&island.meta_file);
+            if candidate.exists() {
+                return Some(island);
+            }
+        }
+        None
+    }
+
+    fn process_metadata(&self, path: &Path, island_def: &IslandDefinition) -> anyhow::Result<()> {
+        debug!("Processing: {:?}", path);
         let content = fs::read_to_string(path)?;
         let yaml: Value = serde_yaml::from_str(&content)?;
-
-        // Pretpostavljamo prvi definiran Island tip (za sada)
-        // U budućnosti bi trebali detektirati tip islanda na temelju sadržaja
-        let island_def = &self.config.islands[0];
 
         let project_name = yaml
             .get("name")
@@ -83,25 +132,22 @@ impl EventProcessor {
             .unwrap_or("Unknown Project");
 
         let project_root = path.parent().unwrap();
-
         let mut relation_map: HashMap<String, Option<String>> = HashMap::new();
 
+        // RELATIONS LOGIC
         for rel in &island_def.relations {
             if let Some(val_raw) = yaml.get(&rel.field) {
                 if let Some(val_str) = val_raw.as_str() {
-                    // FIX: Dinamički dohvaćamo ključno polje za Target Cloud
-                    // Umjesto hardkodiranog "ime" ili "naziv", tražimo prvo polje u definiciji Clouda
+                    // Dinamičko traženje ID polja u target cloudu
                     let target_cloud_def = self
                         .config
                         .clouds
                         .iter()
                         .find(|c| c.name == rel.target_cloud);
-                    let key_field = if let Some(def) = target_cloud_def {
-                        // Uzmi prvo polje kao identifikator (npr. "handle" ili "name")
-                        def.fields.first().map(|f| f.key.as_str()).unwrap_or("id")
-                    } else {
-                        "id"
-                    };
+                    let key_field = target_cloud_def
+                        .and_then(|def| def.fields.first())
+                        .map(|f| f.key.as_str())
+                        .unwrap_or("id");
 
                     let context_info = json!({
                         "source_island_type": island_def.name,
@@ -131,8 +177,10 @@ impl EventProcessor {
             }
         }
 
+        // AGGREGATION LOGIC
         let aggregation_results = Aggregator::calculate(project_root, &island_def.aggregations)?;
 
+        // UPSERT
         self.cloud.upsert_island(
             &island_def.name,
             project_name,
