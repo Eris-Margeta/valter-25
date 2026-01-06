@@ -23,10 +23,13 @@ package-lock.json
 .DS_Store
 
 # --- VALTER SPECIFIC ---
-# Proprietary metadata for local dogfooding (NE UPLOADATI)
+# Proprietary metadata (Dogfooding) - Ignoriramo jer je lokalno
 valter.proprietary.yaml
 
-# Local Config override
+# CONFIG RULES:
+# 1. Ignore user specific/production config
 valter.config
-!valter.config.example
+
+# 2. DO NOT IGNORE the development config (included in repo)
+!valter.dev.config
 

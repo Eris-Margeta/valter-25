@@ -1,28 +1,30 @@
-# VALTER CONFIGURATION
-# Source of Truth for the Valter ERP System.
-# Copy this file to 'valter.config' to activate it.
+# VALTER CONFIGURATION TEMPLATE
+# ---------------------------------------------------------
+# HOW TO USE THIS FILE:
+#
+# 1. FOR SYSTEM INSTALLATION (~/.valter):
+#    Rename this file to 'valter.config'.
+#    Place it in your VALTER_HOME (usually ~/.valter/).
+#    This config will be used when you run 'valter' globally.
+#
+# 2. FOR LOCAL DEVELOPMENT (MONOREPO):
+#    Do NOT use this file directly if you are contributing to Valter.
+#    The repository uses 'valter.dev.config' which is already set up
+#    to scan the 'dev-projects-folder'.
+# ---------------------------------------------------------
 
 GLOBAL:
   company_name: "My Valter Company"
-  currency_symbol: "$"
+  currency_symbol: "€"
   locale: "en_US"
-
-# ------------------------------------------------------------------
-# CLOUDS (Structured Data / SQL)
-# ------------------------------------------------------------------
-# Define entities that need referential integrity (SQL Tables).
-# Valter automatically creates these tables on startup.
 
 CLOUDS:
   - name: "Operator"
     icon: "user"
     fields:
       - key: "handle"
-        type: "string" # e.g. @johndoe
+        type: "string"
         required: true
-      - key: "role"
-        type: "string" # e.g. Admin, Developer
-        required: false
 
   - name: "Client"
     icon: "briefcase"
@@ -30,41 +32,16 @@ CLOUDS:
       - key: "name"
         type: "string"
         required: true
-      - key: "status"
-        type: "select"
-        options: ["Active", "Lead", "Churned"]
-        required: true
-
-# ------------------------------------------------------------------
-# ISLANDS (Folders / Projects)
-# ------------------------------------------------------------------
-# Define how Valter scans your filesystem.
 
 ISLANDS:
   - name: "Project"
-    # Root path: Where should Valter look for projects?
-    # "./*" means all folders in the current root.
-    root_path: "./*"  
+    # POINT THIS TO YOUR ACTUAL WORK DIRECTORY
+    root_path: "/Users/username/MyProjects/*"  
+    meta_file: "meta.yaml" 
     
-    # Metadata File: The file that makes a folder a "Project".
-    # For local development (Dogfooding), we use a proprietary name to avoid conflicts.
-    # In production, this would typically be "meta.yaml".
-    meta_file: "valter.proprietary.yaml" 
-    
-    # Relations: Link fields in the YAML file to SQL Clouds.
-    # If the entity doesn't exist, Valter can implicitely create it or ask for confirmation.
     relations:
       - field: "operator"
         target_cloud: "Operator"
       - field: "client"
         target_cloud: "Client"
-
-    # Aggregations: Deep Scan logic.
-    # Valter will look into subfolders to calculate metrics.
-    aggregations:
-      # Example: Count work orders in the internal folder
-      - name: "total_tasks"
-        path: "VALTER-INTERNAL/RADNI-NALOZI/*.md"
-        target_field: "id"
-        logic: "count"
 
