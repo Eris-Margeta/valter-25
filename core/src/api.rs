@@ -12,7 +12,7 @@ use crate::cloud::SqliteManager;
 use crate::config::Config;
 use crate::fs_writer::FsWriter;
 use std::sync::Arc;
-use tracing::{info, error};
+use tracing::{info}; // Maknuli smo 'error' jer se ne koristi
 use serde_json::Value;
 use std::path::Path;
 
@@ -69,7 +69,7 @@ impl QueryRoot {
 
         let client = reqwest::Client::new();
         let url = format!("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={}", api_key);
-        let prompt = format!("Role: Strata Oracle for {}.\nData:\n{}\nUser Query: {}", state.config.global.company_name, context_str, question);
+        let prompt = format!("Role: Valter Oracle for {}.\nData:\n{}\nUser Query: {}", state.config.global.company_name, context_str, question);
         let body = serde_json::json!({ "contents": [{ "parts": [{"text": prompt}] }] });
 
         match client.post(&url).json(&body).send().await {
@@ -134,9 +134,9 @@ impl MutationRoot {
     }
 }
 
-pub type StrataSchema = Schema<QueryRoot, MutationRoot, EmptySubscription>;
+pub type ValterSchema = Schema<QueryRoot, MutationRoot, EmptySubscription>;
 
-async fn graphql_handler(schema: Extension<StrataSchema>, req: GraphQLRequest) -> GraphQLResponse {
+async fn graphql_handler(schema: Extension<ValterSchema>, req: GraphQLRequest) -> GraphQLResponse {
     schema.execute(req.into_inner()).await.into()
 }
 
@@ -144,8 +144,8 @@ async fn graphiql() -> impl IntoResponse {
     Html(async_graphql::http::playground_source(async_graphql::http::GraphQLPlaygroundConfig::new("/graphql")))
 }
 
-pub async fn start_server(cloud: Arc<SqliteManager>) -> anyhow::Result<()> {
-    let config = Arc::new(Config::load("strata.config")?);
+// FIX: Sada primamo config kao argument, ne učitavamo ga ponovno
+pub async fn start_server(cloud: Arc<SqliteManager>, config: Arc<Config>) -> anyhow::Result<()> {
     let schema = Schema::build(QueryRoot, MutationRoot, EmptySubscription)
         .data(ApiState { cloud, config })
         .finish();

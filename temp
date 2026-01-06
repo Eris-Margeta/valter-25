@@ -1,0 +1,103 @@
+Tvoji logovi zapravo pokazuju da **Backend radi savršeno**! 🚀
+
+Pogledaj što se dogodilo:
+1.  **Skenirao je `..` (root):** Našao je naš dogfooding file `valter.proprietary.yaml`.
+2.  **Skenirao je `examples`: Project Phoenix.**
+3.  **Safety Valve je reagirao:** Primjetio je da "Eris-Margeta" (iz našeg projekta) i "Arnold S." (iz primjera) ne postoje u SQL bazi. **Nije ih slijepo upisao**, već je kreirao `PENDING` akcije. Točno kako smo dizajnirali!
+
+**Zašto nema Dashboarda?**
+Zato što smo u **Monorepo** arhitekturi razdvojili *mozak* (Rust/Core) od *lica* (React/Dashboard). `cargo run` pokreće samo mozak.
+
+Sada moraš pokrenuti Dashboard u **novom terminalu**.
+
+### 1. Ručno pokretanje (Trenutno rješenje)
+
+Ostavi ovaj terminal gdje se vrti Rust otvorenim. Otvori **novi terminal**, idi u root projekta i pokreni:
+
+```bash
+cd dashboard
+pnpm install  # (Samo prvi put)
+pnpm dev
+```
+
+Kada to napraviš, otvori `http://localhost:5173`.
+Tamo ćeš u "Action Centeru" (donji desni kut, žuti trokut) vidjeti te `Pending Actions` za "Eris-Margeta". Klikni **Approve** (Create New) i službeno ćeš postati prvi operater u Valter bazi!
+
+---
+
+### 2. Automatizirano pokretanje (`dev.sh`)
+
+Da ne moraš svaki put otvarati dva terminala, kreirajmo novu skriptu u **ROOT-u** repozitorija koja pali sve odjednom (Backend + Frontend + Sync).
+
+Kreiraj fajl `dev.sh` u rootu:
+
+<FILE_CONTENT_START ID="DEV_SCRIPT" PATH="dev.sh">
+#!/bin/bash
+
+# Funkcija za gašenje svih procesa kad stisnemo Ctrl+C
+cleanup() {
+  echo "Shutting down VALTER..."
+  # Ubija sve child procese u ovoj grupi procesa
+  trap - SIGTERM && kill -- -$$
+}
+
+trap cleanup SIGINT SIGTERM EXIT
+
+echo "---------------------------------------------------"
+echo "  VALTER ERP - DEV ENVIRONMENT"
+echo "---------------------------------------------------"
+
+# 1. Provjera Configa
+if [ ! -f "valter.config" ]; then
+  echo "⚠️  valter.config not found! Copying example..."
+  cp valter.config.example valter.config
+fi
+
+# 2. Pokretanje Backenda (Core)
+echo "[CORE] Starting Daemon (Port 8000)..."
+cd core
+# Koristimo cargo run u backgroundu (&)
+cargo run >../valter.log 2>&1 &
+CORE_PID=$!
+cd ..
+
+# Čekamo malo da se backend digne prije nego palimo frontend
+sleep 2
+echo "[CORE] Logs are streaming to ./valter.log"
+
+# 3. Pokretanje Web Stranice (Docs Sync) - Opcionalno
+# echo "[DOCS] Syncing Documentation..."
+# cd website
+# node scripts/sync-docs.js
+# cd ..
+
+# 4. Pokretanje Frontenda (Dashboard)
+echo "[DASH] Starting Interface (Port 5173)..."
+cd dashboard
+# pnpm dev obično ima lijepe boje, pa ga nećemo pipati u log file, neka piše u terminal
+pnpm dev &
+DASH_PID=$!
+cd ..
+
+echo "---------------------------------------------------"
+echo "SYSTEM ONLINE"
+echo ">> Dashboard: http://localhost:5173"
+echo ">> GraphiQL:  http://localhost:8000/graphql"
+echo "---------------------------------------------------"
+echo "Press Ctrl+C to stop all services."
+
+# Čekaj zauvijek (dok ne stisnemo Ctrl+C)
+wait
+</FILE_CONTENT_END>
+
+**Zatim daj skripti ovlasti za izvršavanje:**
+```bash
+chmod +x dev.sh
+```
+
+**Pokretanje svega:**
+```bash
+./dev.sh
+```
+
+Probaj sada s `./dev.sh` i javi vidiš li Dashboard i možeš li u Action Centeru odobriti sebe ("Eris-Margeta") kao operatera!

@@ -9,7 +9,7 @@ use serde_yaml::Value;
 use std::fs;
 use std::collections::HashMap;
 use walkdir::WalkDir;
-use serde_json::json; // NOVO
+use serde_json::json;
 
 pub struct EventProcessor {
     cloud: Arc<SqliteManager>,
@@ -22,11 +22,15 @@ impl EventProcessor {
     }
 
     pub fn scan_existing_metadata(&self, root_path: &str) {
+        // Podržavamo i relativne putanje s '..'
         info!("Scanning existing islands in: {}", root_path);
         for entry in WalkDir::new(root_path).into_iter().filter_map(|e| e.ok()) {
-            if entry.file_name() == "meta.yaml" {
-                if let Err(e) = self.process_metadata(entry.path()) {
-                    error!("Failed to process {:?}: {}", entry.path(), e);
+            // FIX: Fleksibilnije prepoznavanje meta fajla (podržavamo i naš proprietary)
+            if let Some(fname) = entry.file_name().to_str() {
+                if fname == "meta.yaml" || fname == "valter.proprietary.yaml" {
+                    if let Err(e) = self.process_metadata(entry.path()) {
+                        error!("Failed to process {:?}: {}", entry.path(), e);
+                    }
                 }
             }
         }
@@ -34,17 +38,25 @@ impl EventProcessor {
 
     pub async fn handle_event(&self, event: Event) {
         for path in event.paths {
-            if let Some(file_name) = path.file_name() {
-                if file_name == "meta.yaml" {
+            if let Some(file_name) = path.file_name().and_then(|f| f.to_str()) {
+                // FIX: Podrška za oba imena
+                if file_name == "meta.yaml" || file_name == "valter.proprietary.yaml" {
                     info!("Metadata Change: {:?}", path);
                     let _ = self.process_metadata(&path);
-                } else if path.extension().map_or(false, |ext| ext == "yaml") {
+                } else if path.extension().map_or(false, |ext| ext == "yaml" || ext == "md") {
+                    // Trigger deep scan if sub-files change
                     let mut current = path.parent();
                     while let Some(dir) = current {
-                        let meta_path = dir.join("meta.yaml");
-                        if meta_path.exists() {
+                        let meta_path_1 = dir.join("meta.yaml");
+                        let meta_path_2 = dir.join("valter.proprietary.yaml");
+                        
+                        if meta_path_1.exists() {
                              info!("Deep scan triggered for project at {:?}", dir);
-                             let _ = self.process_metadata(&meta_path);
+                             let _ = self.process_metadata(&meta_path_1);
+                             break;
+                        } else if meta_path_2.exists() {
+                             info!("Deep scan triggered for project at {:?}", dir);
+                             let _ = self.process_metadata(&meta_path_2);
                              break;
                         }
                         current = dir.parent();
@@ -58,6 +70,8 @@ impl EventProcessor {
         let content = fs::read_to_string(path)?;
         let yaml: Value = serde_yaml::from_str(&content)?;
 
+        // Pretpostavljamo prvi definiran Island tip (za sada)
+        // U budućnosti bi trebali detektirati tip islanda na temelju sadržaja
         let island_def = &self.config.islands[0]; 
 
         let project_name = yaml.get("name")
@@ -71,10 +85,17 @@ impl EventProcessor {
         for rel in &island_def.relations {
             if let Some(val_raw) = yaml.get(&rel.field) {
                 if let Some(val_str) = val_raw.as_str() {
-                    let key_field = if rel.target_cloud == "Operater" { "ime" } else { "naziv" };
                     
-                    // FIX: Spremamo JSON kontekst da Frontend može napraviti "Merge/Fix"
-                    // Ovo omogućuje ActionCenter-u da zna koji projekt updateati
+                    // FIX: Dinamički dohvaćamo ključno polje za Target Cloud
+                    // Umjesto hardkodiranog "ime" ili "naziv", tražimo prvo polje u definiciji Clouda
+                    let target_cloud_def = self.config.clouds.iter().find(|c| c.name == rel.target_cloud);
+                    let key_field = if let Some(def) = target_cloud_def {
+                        // Uzmi prvo polje kao identifikator (npr. "handle" ili "name")
+                        def.fields.first().map(|f| f.key.as_str()).unwrap_or("id")
+                    } else {
+                        "id"
+                    };
+
                     let context_info = json!({
                         "source_island_type": island_def.name,
                         "source_island_name": project_name,

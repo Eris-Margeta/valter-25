@@ -1,11 +1,32 @@
-# Dodajemo logove u ignore da ne prljaju repo
+# Global Gitignore for VALTER ERP
+
+# Rust / Core
 /target
-/debug
-/dist
-/node_modules
-*.log
-strata.db
-strata.db-journal
+/core/target
+**/*.rs.bk
+valter.db
+valter.db-journal
+valter.log
+
+# Node / Dashboard / Website
+node_modules/
+dist/
+.vite/
+.astro/
+npm-debug.log*
+yarn-debug.log*
+pnpm-lock.yaml
+package-lock.json
+
+# Environment
 .env
 .DS_Store
+
+# --- VALTER SPECIFIC ---
+# Proprietary metadata for local dogfooding (NE UPLOADATI)
+valter.proprietary.yaml
+
+# Local Config override
+valter.config
+!valter.config.example
 
