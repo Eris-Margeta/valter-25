@@ -41,9 +41,9 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 24
           cache: 'pnpm'
-          cache-dependency-path: 'dashboard/pnpm-lock.yaml'
+          cache-dependency-path: './dashboard/pnpm-lock.yaml'
       - name: Install Dependencies
         run: cd dashboard && pnpm install
       - name: Build

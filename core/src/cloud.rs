@@ -25,9 +25,14 @@ impl SqliteManager {
     pub fn new(path: &str) -> Result<Self> {
         let conn = Connection::open(path).context("Failed to open SQLite DB")?;
         
-        // Performance tuning
-        conn.execute("PRAGMA journal_mode=WAL;", [])?;
-        conn.execute("PRAGMA synchronous=NORMAL;", [])?;
+        // FIX: PRAGMA journal_mode returns a row ("wal"), so execute() fails.
+        // We use query_row to consume that result.
+        let _ : String = conn.query_row("PRAGMA journal_mode=WAL", [], |row| row.get(0))
+            .unwrap_or("delete".to_string());
+            
+        // synchronous=NORMAL doesn't return rows usually, but let's be safe via execute is fine usually,
+        // but strictly speaking some pragmas do return. synchronous usually doesn't.
+        conn.execute("PRAGMA synchronous=NORMAL", [])?;
         
         Ok(Self { conn: Mutex::new(conn) })
     }

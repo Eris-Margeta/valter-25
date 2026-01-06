@@ -1,276 +1,240 @@
-Odlično! Projekt izgleda strukturirano, čisto i spremno za profesionalnu fazu. Čestitam na objavi repozitorija!
+Imamo dva odvojena problema. Riješit ćemo ih jedan po jedan.
 
-Pregledao sam stablo datoteka. Imamo **Core** (Rust), **Dashboard** (React), **Website** (Astro), **Justfile** i svu dokumentaciju.
+### 1. Dashboard (Dev) - "Execute returned results"
 
-Ono što **nedostaje** da bi ovo bio "Top-Tier" GitHub projekt su:
-1.  **CI/CD Pipeline (.github/workflows):** Automatizirano testiranje i buildanje binarnih datoteka za Release.
-2.  **Community Health Files:** `CONTRIBUTING.md` i Issue Templates.
-3.  **Astro Rendering Logic:** Imamo skriptu za sinkronizaciju (`sync-docs.js`), ali nemamo Astro stranicu koja te Markdown fajlove zapravo prikazuje.
+Ovaj error `Execute returned results - did you mean to call query?` dolazi iz `cloud.rs` (Rusqlite). To znači da pokušavamo izvršiti SQL `SELECT` (koji vraća rezultate) koristeći metodu `execute` (koja je samo za INSERT/UPDATE/DELETE), ili obrnuto.
 
-Idemo to riješiti korak po korak.
+Sumnjam na `fetch_all_dynamic` funkciju. Iako tamo koristimo `query_map` (što je točno), problem je vjerojatno u `check_or_create_pending` ili nekom drugom dijelu gdje smo možda pomiješali metode.
 
----
+Ali čekaj! Greška se pojavljuje u logovima? Ne, ti si mi poslao logove koji izgledaju OK (`VALTER is Online`), ali si spomenuo "Error: Execute returned results".
 
-### KORAK 1: GitHub Actions (Automatski Testovi)
-
-Kreiraj mapu `.github/workflows` u rootu.
-Prvi fajl je `ci.yml`. On se pokreće na svaki `push` i osigurava da nisi slomio kod.
-
-**File:** `.github/workflows/ci.yml`
-
-```yaml
-name: CI
-
-on:
-  push:
-    branches: [ "master", "main" ]
-  pull_request:
-    branches: [ "master", "main" ]
-
-env:
-  CARGO_TERM_COLOR: always
-
-jobs:
-  test-core:
-    name: Test Core (Rust)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-      - name: Cache Cargo
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            core/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - name: Check
-        run: cd core && cargo check
-      - name: Test
-        run: cd core && cargo test
-
-  build-dashboard:
-    name: Build Dashboard (React)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v2
-        with:
-          version: 8
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-          cache: 'pnpm'
-          cache-dependency-path: 'dashboard/pnpm-lock.yaml'
-      - name: Install Dependencies
-        run: cd dashboard && pnpm install
-      - name: Build
-        run: cd dashboard && pnpm build
+Pogledajmo `cloud.rs` funkciju `init_schema`. Tamo je bio sumnjiv dio:
+```rust
+// 0. SYSTEM METADATA
+conn.execute("CREATE TABLE ...")?;
+conn.execute("INSERT OR REPLACE ...")?; // Ovo je OK
 ```
 
----
+Idemo provjeriti `fetch_all_dynamic`. Tu je bio problem u `prepare` ako tablica ne postoji.
 
-### KORAK 2: Release Pipeline (Buildanje Binarki)
-
-Ovo je "The Big One". Kada kreiraš novi Release na GitHubu (npr. `v0.1.0`), ova akcija će se pokrenuti, kompajlirati Valter za Linux, Windows i Mac, i automatski uploadati te fajlove na Release page.
-
-**File:** `.github/workflows/release.yml`
-
-```yaml
-name: Release
-
-permissions:
-  contents: write
-
-on:
-  push:
-    tags:
-      - "v*"
-
-jobs:
-  create-release:
-    runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-    steps:
-      - name: Create Release
-        id: create_release
-        uses: softprops/action-gh-release@v1
-        with:
-          draft: false
-          prerelease: false
-          generate_release_notes: true
-
-  build-assets:
-    name: Build Release Assets
-    needs: create-release
-    runs-on: ${{ matrix.config.os }}
-    strategy:
-      matrix:
-        config:
-          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu, suffix: "" }
-          - { os: macos-latest, target: x86_64-apple-darwin, suffix: "" }
-          - { os: macos-latest, target: aarch64-apple-darwin, suffix: "" } # M1/M2 Mac
-          - { os: windows-latest, target: x86_64-pc-windows-msvc, suffix: ".exe" }
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.config.target }}
-
-      - name: Build Release
-        run: cd core && cargo build --release --target ${{ matrix.config.target }}
-
-      - name: Package Asset
-        shell: bash
-        run: |
-          cd core/target/${{ matrix.config.target }}/release
-          
-          # Rename binary to generic name for packaging
-          cp valter${{ matrix.config.suffix }} ../../../valter-${{ matrix.config.target }}${{ matrix.config.suffix }}
-          cd ../../..
-          
-          # Upload directly to release
-      
-      - name: Upload Release Asset
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: core/valter-${{ matrix.config.target }}${{ matrix.config.suffix }}
+**DIJAGNOZA:**
+Problem je najvjerojatnije u **Frontend API pozivu**. Frontend šalje query, a backend možda pokušava napraviti nešto krivo.
+No, pogledaj `cloud.rs`:
+```rust
+// U init_schema imamo:
+conn.execute(pending_query, [])?;
 ```
+Ako `pending_query` počinje s `CREATE TABLE`, to je OK.
 
----
-
-### KORAK 3: Astro Rendering (Website)
-
-Imamo `sync-docs.js` koji kopira `README.md` u `website/src/content/docs/index.md`. Ali Astro treba layout da to prikaže.
-
-**1. Instaliraj Astro Tailwind (ako već nisi):**
-(Unutar `website/` foldera)
-```bash
-pnpm astro add tailwind
+**AHA! NAŠAO SAM KRIVCA.**
+U `cloud.rs` smo imali ovu liniju u `upsert_island`:
+```rust
+let query_select = format!("SELECT id FROM {} WHERE name = ?", table);
+// ...
+conn.execute(&format!("DELETE FROM {} WHERE id = ?", table), params![project_id])?;
 ```
+To je ispravno.
 
-**2. Kreiraj Layout:** `website/src/layouts/Layout.astro`
-```astro
----
-interface Props {
-	title: string;
-}
+Ali pogledajmo error opet: `Error: Execute returned results - did you mean to call query?`.
+Ovo se u Rusqlite događa kada pozoveš `conn.execute("SELECT ...")`.
 
-const { title } = Astro.props;
----
-
-<!doctype html>
-<html lang="en">
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="description" content="Valter ERP Documentation" />
-		<meta name="viewport" content="width=device-width" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<title>{title}</title>
-	</head>
-	<body class="bg-slate-900 text-slate-200 font-sans">
-		<div class="max-w-4xl mx-auto px-6 py-12">
-            <header class="mb-12 border-b border-slate-800 pb-6 flex justify-between items-center">
-                <h1 class="text-3xl font-bold text-emerald-400">VALTER ERP</h1>
-                <nav class="space-x-4">
-                    <a href="/" class="hover:text-white">Home</a>
-                    <a href="/roadmap" class="hover:text-white">Roadmap</a>
-                    <a href="https://github.com/Eris-Margeta/valter-25" class="hover:text-white">GitHub</a>
-                </nav>
-            </header>
-			<slot />
-		</div>
-	</body>
-</html>
+Pogledajmo `init_schema` opet:
+```rust
+let table_exists: bool = conn.query_row(
+    "SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?",
+    params![table_name],
+    |row| row.get(0),
+).unwrap_or(0) > 0;
 ```
+Ovo je `query_row`, to je ispravno.
 
-**3. Kreiraj Dynamic Page za Dokumentaciju:** `website/src/pages/[...slug].astro`
-Ovo je magija. Ovo će uhvatiti *sve* markdown fajlove koje je `sync-docs.js` kopirao i pretvoriti ih u HTML.
-
-```astro
----
-import { getCollection } from 'astro:content';
-import Layout from '../layouts/Layout.astro';
-
-export async function getStaticPaths() {
-  // Ovdje učitavamo 'docs' kolekciju koju puni tvoja sync skripta
-  const blogEntries = await getCollection('docs');
-  return blogEntries.map(entry => ({
-    params: { slug: entry.slug }, props: { entry },
-  }));
-}
-
-const { entry } = Astro.props;
-const { Content } = await entry.render();
----
-
-<Layout title={entry.data.title}>
-    <article class="prose prose-invert prose-emerald max-w-none">
-        <h1>{entry.data.title}</h1>
-        <Content />
-    </article>
-</Layout>
+Čekaj, pogledajmo `fetch_all_dynamic`:
+```rust
+let mut stmt = match conn.prepare(&query) { ... }
+let rows = stmt.query_map ...
 ```
+I to je ispravno.
 
-**4. Definiraj Kolekciju:** `website/src/content/config.ts`
-```typescript
-import { defineCollection, z } from 'astro:content';
+**MOŽE LI BITI U `main.rs`?**
+Ne.
 
-const docsCollection = defineCollection({
-  type: 'content',
-  schema: z.object({
-    title: z.string(),
-    // Ostala polja su opcionalna
-  }),
-});
-
-export const collections = {
-  'docs': docsCollection,
-};
+**MOŽE LI BITI U `check_or_create_pending`?**
+```rust
+// let mut stmt = conn.prepare(&query_exact)?;
+// let mut rows = stmt.query(params![value])?;
 ```
+To je ispravno.
+
+Hmm. Idemo pogledati gdje se točno događa. Jedino mjesto gdje radimo `execute` je `init_schema` i `upsert_island` (i `approve/reject`).
+
+Ako se događa pri startu (prije nego dashboard išta pita), onda je u `init_schema` ili `EventProcessor`.
+
+**SUMNJA:** U `init_schema` sam napisao:
+```rust
+// ...
+let table_exists: bool = conn.query_row(...) ...
+if !table_exists {
+    conn.execute(&query, [])?; // CREATE TABLE
+} else {
+    // ...
+    if let Err(e) = conn.execute(&query, []) { // ALTER TABLE
+```
+`ALTER TABLE` ne vraća rezultate, to je OK.
+
+**Čekaj, imam ideju.**
+Možda je problem u `pragma`?
+```rust
+conn.execute("PRAGMA journal_mode=WAL;", [])?;
+conn.execute("PRAGMA synchronous=NORMAL;", [])?;
+```
+`PRAGMA journal_mode=WAL` **VRAĆA REZULTAT** (string "wal").
+A mi koristimo `execute`.
+**BINGO.** Rusqlite se buni jer `PRAGMA journal_mode` vraća redak s trenutnim modom, a mi smo rekli `execute` (očekujemo 0 redaka).
+
+**RJEŠENJE ZA CORE:**
+Promijenit ćemo `execute` u `query_row` ili koristiti `pragma_update` (ako postoji) ili jednostavno ignorirati rezultat ispravno. Najlakše je koristiti `query_row` i baciti rezultat.
 
 ---
 
-### KORAK 4: Community Files
+### 2. Just Install Error
 
-U rootu projekta:
+Error: `cp: core/target/release/valter: No such file or directory`
 
-**`CONTRIBUTING.md`**
-```markdown
-# Contributing to VALTER
-
-Thank you for your interest in building the future of Data Operating Systems!
-
-## Getting Started
-1. Fork the repo.
-2. Run `just dev` to start the Monorepo environment.
-3. Make your changes in `core/` (Rust) or `dashboard/` (React).
-
-## Pull Requests
-- Please follow the existing code style.
-- Ensure `cargo test` passes.
-- Update documentation if you change configuration options.
+Razlog: Naša skripta radi `cd core && cargo build --release`, ali onda pokušava kopirati iz `core/target/release/valter`.
+Kada si u `core` folderu i pokreneš build, on stavi target u `core/target`.
+Ali `just` se vrti u rootu.
+Komanda u Justfileu je:
+```makefile
+cd core && cargo build --release
+cp core/target/release/valter ~/.local/bin/valter
 ```
+Ako smo u rootu, `cd core && ...` se izvrši u subshellu. Target bi trebao biti u `core/target`.
+Međutim, budući da imamo **Workspace** (root `Cargo.toml`), Cargo možda stavlja buildove u **ROOT** `target` folder, a ne u `core/target`.
+
+Provjeri root folder. Imaš li `target/release/valter`?
+Vjerojatno da. Kada koristiš Workspaces, svi buildovi idu u zajednički `target` u rootu.
+
+**RJEŠENJE ZA JUST:**
+Promijeniti putanju kopiranja iz `core/target/...` u `target/...`.
 
 ---
 
-### ZADATAK ZA TEBE
+### PLAN POPRAVKA
 
-1.  **Kopiraj** ove YAML konfiguracije u `.github/workflows/`.
-2.  **Postavi** Astro stranice kako je navedeno u Koraku 3.
-3.  **Pushaj** sve na GitHub.
-4.  **Testiraj Release:**
-    *   Otiđi na GitHub -> Releases -> Draft a new release.
-    *   Stavi tag `v0.1.0`.
-    *   Klikni "Publish release".
-    *   Gledaj "Actions" tab kako tvoji serveri rade i izbacuju binarne datoteke!
+### POPRAVAK 1: `core/src/cloud.rs` (PRAGMA Fix)
 
-Nakon ovoga, Valter je **službeno živ** i spreman za distribuciju.
+Zamijeni metodu `new`:
+
+<FILE_CONTENT_START ID="CLOUD_PRAGMA_FIX" PATH="core/src/cloud.rs">
+    pub fn new(path: &str) -> Result<Self> {
+        let conn = Connection::open(path).context("Failed to open SQLite DB")?;
+        
+        // FIX: PRAGMA journal_mode returns a row ("wal"), so execute() fails.
+        // We use query_row to consume that result.
+        let _ : String = conn.query_row("PRAGMA journal_mode=WAL", [], |row| row.get(0))
+            .unwrap_or("delete".to_string());
+            
+        // synchronous=NORMAL doesn't return rows usually, but let's be safe via execute is fine usually,
+        // but strictly speaking some pragmas do return. synchronous usually doesn't.
+        conn.execute("PRAGMA synchronous=NORMAL", [])?;
+        
+        Ok(Self { conn: Mutex::new(conn) })
+    }
+</FILE_CONTENT_END>
+
+Napomena: Moraš zamijeniti samo `pub fn new` unutar `impl SqliteManager`. Ostatak fajla ostaje isti. Ako želiš cijeli fajl za sigurnost, reci.
+
+### POPRAVAK 2: `Justfile` (Install path fix)
+
+Ažuriraj `install` i `update` sekcije.
+
+<FILE_CONTENT_START ID="JUSTFILE_FIX" PATH="Justfile">
+# VALTER ERP - JUSTFILE
+# Commands for Development, Installation, Maintenance, and Release.
+
+# Default: List available commands
+default:
+    @just --list
+
+# --- DEVELOPMENT ---
+
+# Run the full stack in Dev Mode (Monorepo root)
+dev:
+    @echo "🚀 Starting VALTER DEV Environment..."
+    @# Run Backend in background, then Frontend. Trap SIGINT to kill backend on Ctrl+C.
+    @trap 'kill %1' SIGINT; \
+    (cd core && cargo run) & \
+    (cd dashboard && pnpm dev)
+
+# Clean build artifacts and temporary files
+clean:
+    @echo "🧹 Cleaning up..."
+    rm -rf target core/target
+    rm -rf dashboard/dist dashboard/.vite dashboard/node_modules
+    rm -f valter.db valter.log
+
+# --- RELEASE ---
+
+# Create a new release (Tag & Push). Usage: just release v0.1.0
+release version:
+    @echo "🚀 Preparing release {{version}}..."
+    @if [ -z "{{version}}" ]; then echo "❌ Error: Version required. Usage: just release v0.1.0"; exit 1; fi
+    @if [ -n "$(git status --porcelain)" ]; then echo "❌ Error: Git is dirty. Commit changes first."; exit 1; fi
+    @echo "🏷️  Tagging version {{version}}..."
+    git tag -a {{version}} -m "Release {{version}}"
+    @echo "⬆️  Pushing tag to GitHub..."
+    git push origin {{version}}
+    @echo "✅ Done! GitHub Actions will now build and publish the release."
+    @echo "   Check status here: https://github.com/Eris-Margeta/valter-25/actions"
+
+# --- INSTALLATION (SYSTEM WIDE) ---
+
+# Install Valter to ~/.local/bin and setup ~/.valter config
+install:
+    @echo "⚠️  WARNING: This will overwrite ~/.valter configuration and binary."
+    @echo "   Press Ctrl+C to cancel or Enter to proceed."
+    @read _
+    
+    @echo "📦 Building Release Binary..."
+    # Build from root workspace
+    cargo build --release
+    
+    @echo "📂 Creating System Directories (~/.valter)..."
+    mkdir -p ~/.valter
+    mkdir -p ~/.local/bin
+    
+    @echo "🚚 Installing Binary..."
+    # FIX: Workspace puts artifacts in root target/release
+    cp target/release/valter ~/.local/bin/valter
+    
+    @echo "📝 Installing Default Config..."
+    # We copy the example config to the production path
+    cp valter.config.example ~/.valter/valter.config
+    
+    @echo "✅ Installation Complete!"
+    @echo "   Run 'valter' to start the daemon."
+    @echo "   (Ensure ~/.local/bin is in your PATH)"
+
+# --- MAINTENANCE ---
+
+# Update the binary ONLY (Preserves Data & Config)
+update:
+    @echo "🔄 Updating Valter Binary..."
+    cargo build --release
+    cp target/release/valter ~/.local/bin/valter
+    @echo "✅ Binary Updated. Run 'valter' to apply migrations."
+
+# Check for database schema changes (Dry Run - Placeholder for future CLI arg)
+check-migrations:
+    @echo "🔍 Checking migrations..."
+    @echo "Note: Currently Valter applies migrations automatically on startup."
+</FILE_CONTENT_END>
+
+---
+
+### Što sad?
+
+1.  **Primijeni `cloud.rs` fix.** To će riješiti `Execute returned results`.
+2.  **Primijeni `Justfile` fix.** To će riješiti `cp: No such file`.
+3.  **Probaj `just dev` opet.** Dashboard bi trebao raditi (i API pozivi bi trebali prolaziti).
+4.  **Probaj `just install`.** Trebalo bi proći glatko.
