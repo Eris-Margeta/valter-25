@@ -37,28 +37,45 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # ISPRAVAK: Dodajemo build dashboarda prije builda Rust binary-a
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+          cache-dependency-path: 'dashboard/pnpm-lock.yaml'
+      - name: Install Dashboard Dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: ./dashboard
+      - name: Build Dashboard
+        run: pnpm build
+        working-directory: ./dashboard
+
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.config.target }}
 
       - name: Build Release
-        run: cd core && cargo build --release --target ${{ matrix.config.target }}
+        # Buildamo iz roota da rust-embed nađe ispravnu putanju do dashboard/dist
+        run: cargo build --manifest-path core/Cargo.toml --release --target ${{ matrix.config.target }}
 
       - name: Package Asset
         shell: bash
         run: |
-          cd core/target/${{ matrix.config.target }}/release
+          # Ažuriramo putanju jer buildamo iz roota
+          cd target/${{ matrix.config.target }}/release
           
           # Rename binary to generic name for packaging
           cp valter${{ matrix.config.suffix }} ../../../valter-${{ matrix.config.target }}${{ matrix.config.suffix }}
           cd ../../..
-          
-          # Upload directly to release
       
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: core/valter-${{ matrix.config.target }}${{ matrix.config.suffix }}
-
+          files: valter-${{ matrix.config.target }}${{ matrix.config.suffix }}

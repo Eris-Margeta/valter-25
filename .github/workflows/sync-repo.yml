@@ -5,7 +5,7 @@ on:
     branches: [ "main", "master" ]
     paths:
       - 'README.md'
-      - 'valter.dev.config'
+      - 'meta.yaml' # Ažurirano da prati i meta.yaml
       - 'VALTER-INTERNAL/RADNI-NALOZI/**'
 
 jobs:
@@ -13,28 +13,30 @@ jobs:
   sync-metadata:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      # 'repo' permission je potreban za gh repo edit
+      contents: read
+      repository: write 
     steps:
       - uses: actions/checkout@v4
       
-      - name: Update Repo Info
+      # Dodajemo yq za parsiranje YAML-a
+      - name: Install yq
+        run: sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && sudo chmod +x /usr/bin/yq
+
+      - name: Update Repo Info from meta.yaml
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # 1. Izvuci opis iz README-a (Prvi paragraf nakon naslova)
-          # Ovo je jednostavna bash logika, može se pojačati
-          DESCRIPTION=$(grep -A 2 "# VALTER ERP" README.md | tail -n 1)
-          
-          # 2. Homepage URL
-          HOMEPAGE="https://valter.erp" # Ili izvuci iz configa
+          # 1. Izvuci opis i homepage URL iz meta.yaml
+          DESCRIPTION=$(yq e '.description' meta.yaml)
+          HOMEPAGE=$(yq e '.repo' meta.yaml) # Koristimo 'repo' polje za homepage
           
           # 3. Ažuriraj GitHub putem CLI-a
           echo "Updating description to: $DESCRIPTION"
+          echo "Updating homepage to: $HOMEPAGE"
           gh repo edit --description "$DESCRIPTION" --homepage "$HOMEPAGE" --enable-issues=true --enable-projects=true
 
   # 2. Sinkronizacija Radnih Naloga (Issues)
-  # Ovo koristi 'todo-to-issue-action'.
-  # On traži "TODO" u kodu, ali možemo ga konfigurirati da gleda i Markdown fajlove.
   sync-issues:
     runs-on: ubuntu-latest
     permissions:
@@ -46,7 +48,5 @@ jobs:
       - name: Convert TODOs to Issues
         uses: alstr/todo-to-issue-action@v4
         with:
-          # Skeniraj cijeli repo
-          INSERT_ISSUE_URLS: "true"
           CLOSE_ISSUES: "true" # Ako obrišeš TODO, zatvara Issue
           AUTO_ASSIGN: "true"
