@@ -39,7 +39,7 @@ build-app:
 # Build the Headless Server Binary (Legacy/Server Mode)
 build-server:
     @echo "🏗️  Building Dashboard Assets..."
-    cd app && pnpm build
+    cd app && pnpm install && pnpm build
     @echo "📦 Building Headless Core..."
     cargo build --release --manifest-path core/Cargo.toml
 
@@ -55,7 +55,7 @@ release version:
     git push origin {{version}}
     @echo "✅ Done! GitHub Actions will now build and publish the release."
 
-# --- INSTALLATION (SYSTEM WIDE) ---
+# --- INSTALLATION (SYSTEM WIDE / HEADLESS) ---
 
 install:
     @echo "⚠️  WARNING: This will overwrite ~/.valter configuration and binary."
@@ -87,3 +87,21 @@ install:
     @echo "✅ Installation Complete!"
     @echo "   To start: 'valter start'"
     @echo "   Then open: http://localhost:9090 (or configured port)"
+
+# Update the binary without touching config
+update:
+    @echo "🔄 Updating Valter Binary..."
+    @echo "🏗️  Rebuilding Dashboard..."
+    cd app && pnpm install && pnpm build
+    @echo "📦 Rebuilding Core..."
+    cargo build --release --manifest-path core/Cargo.toml
+    
+    @echo "🚚 Copying binary..."
+    cp core/target/release/valter ~/.local/bin/valter
+    
+    @if [ "$(uname)" = "Darwin" ]; then \
+        echo "🍎 macOS detected: Signing binary..."; \
+        codesign -s - --force ~/.local/bin/valter; \
+    fi
+    
+    @echo "✅ Updated. Restart daemon with 'valter stop' then 'valter start'."
