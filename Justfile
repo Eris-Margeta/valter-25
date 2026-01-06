@@ -21,7 +21,7 @@ dev:
     
     @# Trap SIGINT (Ctrl+C) to run cleanup
     @trap 'echo "\n🛑 Shutting down..."; lsof -ti:8000 | xargs kill -9 2>/dev/null; lsof -ti:5173 | xargs kill -9 2>/dev/null; exit 0' SIGINT; \
-    (cd core && cargo run -- run) & \
+    export VALTER_HOME=$(pwd) && cd core && cargo run -- run & \
     (cd dashboard && pnpm install && pnpm dev) & \
     wait
 
