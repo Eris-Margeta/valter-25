@@ -152,9 +152,44 @@ We use the **Conventional Commits** specification. This is not optional, as it d
 4.  **Commit:** Use the conventional commit format.
 5.  **Push & PR:** Push your branch and create a Pull Request. Let the CI system do the final validation.
 
+### E. Code structure 
+1. Code must always work in the development mode via "just dev" command and in production mode via "just install", and then "valter start", completely separately and independently. Those two versions of the code must be able to run together on the same machine and not interconnect in services, ports, or cross-talk or share data.
+
 ---
 
-## 6. INITIATION
+## 6. CODING STANDARDS & STYLE GUIDE
+
+To maintain a high-quality codebase, all contributors must adhere to these standards.
+
+### A. Naming Conventions
+*   **Kebab-Case:** We prioritize `kebab-case` for file names, directories, and URL paths (e.g., `user-profile.tsx`, `event-processor.rs`).
+*   **Consistency:** Follow the language-specific standard for variables (snake_case for Rust, camelCase for TS/JS), but strict kebab-case for the filesystem.
+
+### B. Frontend (React/Vite)
+*   **Modern Syntax:** Use modern Vite and React 18/19 patterns.
+*   **Named Exports:** Do NOT use `export default`. Use named exports for all components (e.g., `export function Dashboard() { ... }`).
+*   **Hygiene:** Strictly remove unused imports. No legacy code should be left commented out.
+*   **Atomic Design:** Keep components small and focused.
+
+### C. Code Organization
+*   **Single Responsibility:** One file serves one purpose.
+*   **Splitting:** If a file grows too large or handles divergent logic, split it into multiple smaller files immediately.
+*   **Readability:** Code must be clean, well-commented where complex, and organized logically.
+
+### D. Monorepo & Dependencies
+*   **Justfile Authority:** The `Justfile` is the core of our developer experience. Respect existing commands. When modifying it, be extremely careful not to break existing workflows.
+*   **Lockfiles:** **NEVER** manually edit `package.json` versions or `Cargo.toml` dependencies manually unless fixing a specific conflict.
+    *   Use `pnpm add <package>` or `cargo add <crate>` to ensure lockfiles remain consistent.
+    *   Editing `scripts` or configuration fields is permitted.
+
+### E. File Editing Protocol (AI & Human)
+*   **Non-Destructive Editing:** When modifying a file, ensure you do not accidentally remove existing functionality.
+*   **Context Awareness:** Always consider the file's role in the larger Monorepo before changing it.
+*   **Completeness:** When updating a file, ensure the entire file is valid and complete. Do not leave "rest of code here" placeholders unless specifically instructing a partial diff application.
+
+---
+
+## 7. INITIATION
 **Current Status:** Phase 4 planning. Core system is operational.
 **Instructions:**
 1.  Acknowledge this updated architecture.
