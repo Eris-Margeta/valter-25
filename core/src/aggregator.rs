@@ -1,15 +1,18 @@
-use crate::config::{AggregationRule, AggregationLogic};
-use glob::glob;
-use std::path::Path;
-use std::fs;
-use serde_yaml::Value;
-use tracing::{info, warn};
+use crate::config::{AggregationLogic, AggregationRule};
 use anyhow::Result;
+use glob::glob;
+use serde_yaml::Value;
+use std::fs;
+use std::path::Path;
+use tracing::{info, warn};
 
 pub struct Aggregator;
 
 impl Aggregator {
-    pub fn calculate(root_path: &Path, rules: &[AggregationRule]) -> Result<std::collections::HashMap<String, f64>> {
+    pub fn calculate(
+        root_path: &Path,
+        rules: &[AggregationRule],
+    ) -> Result<std::collections::HashMap<String, f64>> {
         let mut results = std::collections::HashMap::new();
 
         for rule in rules {
@@ -19,7 +22,10 @@ impl Aggregator {
             let search_pattern = root_path.join(&rule.path);
             let search_pattern_str = search_pattern.to_string_lossy();
 
-            info!("Deep Scan: Searching '{}' for rule '{}'", search_pattern_str, rule.name);
+            info!(
+                "Deep Scan: Searching '{}' for rule '{}'",
+                search_pattern_str, rule.name
+            );
 
             if let Ok(paths) = glob(&search_pattern_str) {
                 for entry in paths {
@@ -39,7 +45,13 @@ impl Aggregator {
             let final_value = match rule.logic {
                 AggregationLogic::Sum => total,
                 AggregationLogic::Count => count,
-                AggregationLogic::Average => if count > 0.0 { total / count } else { 0.0 },
+                AggregationLogic::Average => {
+                    if count > 0.0 {
+                        total / count
+                    } else {
+                        0.0
+                    }
+                }
             };
 
             results.insert(rule.name.clone(), final_value);
@@ -63,4 +75,3 @@ impl Aggregator {
         })
     }
 }
-

@@ -1,15 +1,15 @@
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use anyhow::Result;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Config {
     #[serde(rename = "GLOBAL")]
     pub global: GlobalConfig,
-    
+
     #[serde(rename = "CLOUDS")]
     pub clouds: Vec<CloudDefinition>,
-    
+
     #[serde(rename = "ISLANDS")]
     pub islands: Vec<IslandDefinition>,
 }
@@ -84,12 +84,11 @@ impl Config {
     pub fn load(path: &str) -> Result<Self> {
         let content = fs::read_to_string(path)?;
         let config: Config = serde_yaml::from_str(&content)?;
-        
+
         if config.clouds.is_empty() {
             anyhow::bail!("Configuration must define at least one CLOUD.");
         }
-        
+
         Ok(config)
     }
 }
-

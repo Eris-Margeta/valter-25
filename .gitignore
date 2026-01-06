@@ -7,8 +7,6 @@
 valter.db
 valter.db-journal
 valter.log
-valter.db-shm
-valter.db-wal
 
 # Node / Dashboard / Website
 node_modules/

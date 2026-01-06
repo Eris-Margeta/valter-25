@@ -1,6 +1,6 @@
 use crate::config::Config;
-use serde_json::{json, Value};
 use anyhow::Result;
+use serde_json::{json, Value};
 
 pub struct ToolGenerator;
 
@@ -12,7 +12,7 @@ impl ToolGenerator {
         for cloud in &config.clouds {
             let tool_name = format!("get_{}", cloud.name.to_lowercase());
             let description = format!("Dohvati detalje za entitet '{}' iz baze.", cloud.name);
-            
+
             let tool = json!({
                 "type": "function",
                 "function": {
@@ -36,10 +36,17 @@ impl ToolGenerator {
         // 2. Generiraj alate za ISLANDS (Projekti i Agregacije)
         for island in &config.islands {
             for agg in &island.aggregations {
-                let tool_name = format!("get_{}_{}", island.name.to_lowercase(), agg.name.to_lowercase());
+                let tool_name = format!(
+                    "get_{}_{}",
+                    island.name.to_lowercase(),
+                    agg.name.to_lowercase()
+                );
                 // FIX: Koristimo {:?} za ispis Enuma (Sum, Count...)
-                let description = format!("Izračunaj '{}' ({:?}) za {}.", agg.name, agg.logic, island.name);
-                
+                let description = format!(
+                    "Izračunaj '{}' ({:?}) za {}.",
+                    agg.name, agg.logic, island.name
+                );
+
                 let tool = json!({
                     "type": "function",
                     "function": {
@@ -64,4 +71,3 @@ impl ToolGenerator {
         Ok(json!(tools))
     }
 }
-

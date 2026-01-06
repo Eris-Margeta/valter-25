@@ -1,9 +1,9 @@
+use anyhow::Result;
 use ignore::WalkBuilder;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use anyhow::Result;
-use tracing::{warn};
+use tracing::warn;
 
 pub struct ContextEngine;
 
@@ -14,7 +14,7 @@ impl ContextEngine {
 
     pub fn get_context(&self, root_path: &str) -> Result<String> {
         let mut context = String::new();
-        
+
         let walker = WalkBuilder::new(root_path)
             .hidden(true) // Skip hidden files
             .git_ignore(true)
@@ -49,11 +49,14 @@ impl ContextEngine {
             Ok(text) => {
                 // 3. Format as XML
                 let path_str = path.to_string_lossy();
-                Ok(format!("<file path=\"{}\">
+                Ok(format!(
+                    "<file path=\"{}\">
 {}
 </file>
-", path_str, text))
-            },
+",
+                    path_str, text
+                ))
+            }
             Err(_) => Ok(String::new()), // Skip unreadable files
         }
     }
@@ -63,17 +66,17 @@ impl ContextEngine {
         let mut buffer = [0; 1024];
         // Read up to 1024 bytes
         let n = file.read(&mut buffer)?;
-        
+
         // Simple check: look for null bytes
         for i in 0..n {
             if buffer[i] == 0 {
                 return Ok(true);
             }
         }
-        
+
         Ok(false)
     }
-    
+
     // Helper for future use (as per spec)
     #[allow(dead_code)]
     fn estimate_tokens(&self, text: &str) -> usize {

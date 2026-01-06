@@ -1,21 +1,27 @@
 # VALTER ERP - JUSTFILE
+# Commands for Development, Installation, Maintenance, and Release.
 
 default:
     @just --list
 
 # --- DEVELOPMENT ---
 
+# Run the full stack in Dev Mode (Monorepo root)
+# Pre-flight: Kill anything on ports 8000 (Backend) and 5173 (Vite Frontend)
+# Trap: Kill everything on exit
 dev:
-    @echo "🧹 Pre-flight: Killing zombies..."
+    @echo "🧹 Pre-flight: Killing zombies on ports 8000 & 5173..."
     @-lsof -ti:8000 | xargs kill -9 2>/dev/null || true
     @-lsof -ti:5173 | xargs kill -9 2>/dev/null || true
     
-    @# Ensure dist folder exists so rust-embed doesn't crash compilation
+    @# Ensure dist folder exists for rust-embed
     @mkdir -p dashboard/dist && touch dashboard/dist/index.html
     
     @echo "🚀 Starting VALTER DEV Environment..."
     @echo "   Backend: http://localhost:8000"
-    @echo "   Frontend: http://localhost:5173 (Hot Reload)"
+    @echo "   Frontend: http://localhost:5173"
+    
+    @# Run backend and frontend in background, trap SIGINT to clean up
     @trap 'echo "\n🛑 Shutting down..."; lsof -ti:8000 | xargs kill -9 2>/dev/null; lsof -ti:5173 | xargs kill -9 2>/dev/null; exit 0' SIGINT; \
     (cd core && cargo run -- run) & \
     (cd dashboard && pnpm dev) & \
@@ -25,38 +31,47 @@ clean:
     @echo "🧹 Cleaning up..."
     rm -rf target core/target
     rm -rf dashboard/dist dashboard/.vite dashboard/node_modules
-    rm -f valter.db valter.log valter.pid
+    rm -f valter.db valter.log valter.pid valter.db-shm valter.db-wal
 
 # --- RELEASE ---
 
 release version:
     @echo "🚀 Preparing release {{version}}..."
-    @if [ -z "{{version}}" ]; then echo "❌ Error: Version required."; exit 1; fi
+    @if [ -z "{{version}}" ]; then echo "❌ Error: Version required. Usage: just release v0.1.0"; exit 1; fi
+    @if [ -n "$(git status --porcelain)" ]; then echo "❌ Error: Git is dirty. Commit changes first."; exit 1; fi
     @echo "📦 Building Frontend for Release..."
     cd dashboard && pnpm install && pnpm build
-    
-    @echo "🏷️  Tagging & Pushing..."
+    @echo "🏷️  Tagging version {{version}}..."
     git tag -a {{version}} -m "Release {{version}}"
+    @echo "⬆️  Pushing tag to GitHub..."
     git push origin {{version}}
+    @echo "✅ Done! GitHub Actions will now build and publish the release."
 
 # --- INSTALLATION (SYSTEM WIDE) ---
 
 install:
     @echo "⚠️  WARNING: This will overwrite ~/.valter configuration and binary."
+    @echo "   Press Ctrl+C to cancel or Enter to proceed."
     @read _
     
     @echo "🏗️  Building Dashboard (React)..."
     cd dashboard && pnpm install && pnpm build
     
     @echo "📦 Building Core Binary (Embedding Dashboard)..."
-    # Cargo build will now pick up the files in dashboard/dist
     cargo build --release
     
-    @echo "📂 Setting up ~/.valter..."
-    mkdir -p ~/.valter ~/.local/bin
+    @echo "📂 Creating System Directories (~/.valter)..."
+    mkdir -p ~/.valter
+    mkdir -p ~/.local/bin
     
     @echo "🚚 Installing Binary..."
     cp target/release/valter ~/.local/bin/valter
+    
+    @# MACOS SIGNING FIX
+    @if [ "$(uname)" = "Darwin" ]; then \
+        echo "🍎 macOS detected: Signing binary..."; \
+        codesign -s - --force ~/.local/bin/valter; \
+    fi
     
     @echo "📝 Installing Default Config..."
     cp valter.config.example ~/.valter/valter.config
@@ -74,5 +89,15 @@ update:
     @echo "📦 Rebuilding Core..."
     cargo build --release
     cp target/release/valter ~/.local/bin/valter
+    
+    @if [ "$(uname)" = "Darwin" ]; then \
+        echo "🍎 macOS detected: Signing binary..."; \
+        codesign -s - --force ~/.local/bin/valter; \
+    fi
+    
     @echo "✅ Updated. Restart daemon with 'valter stop' then 'valter start'."
+
+check-migrations:
+    @echo "🔍 Checking migrations..."
+    @echo "Note: Currently Valter applies migrations automatically on startup."
 

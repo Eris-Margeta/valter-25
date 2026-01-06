@@ -1,8 +1,8 @@
-use std::path::{Path, PathBuf};
-use std::fs;
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use serde_yaml::Value;
-use tracing::{info, debug};
+use std::fs;
+use std::path::{Path, PathBuf};
+use tracing::{debug, info};
 
 pub struct FsWriter;
 
@@ -37,7 +37,7 @@ impl FsWriter {
         // Ovo sprječava korupciju podataka ako nestane struje usred pisanja.
         let temp_path = file_path.with_extension("tmp");
         let new_content = serde_yaml::to_string(&yaml)?;
-        
+
         fs::write(&temp_path, new_content)?;
         fs::rename(&temp_path, file_path)?;
 
@@ -46,11 +46,15 @@ impl FsWriter {
     }
 
     /// Kreira novi projekt (Island) iz temelja
-    pub fn create_island(root_dir: &str, name: &str, template_data: Vec<(String, String)>) -> Result<()> {
+    pub fn create_island(
+        root_dir: &str,
+        name: &str,
+        template_data: Vec<(String, String)>,
+    ) -> Result<()> {
         // Sanitize name for folder
         let safe_name = name.replace(" ", "_").replace("/", "-");
         let project_path = Path::new(root_dir).join(&safe_name);
-        
+
         if project_path.exists() {
             anyhow::bail!("Project folder already exists: {:?}", project_path);
         }
@@ -59,23 +63,25 @@ impl FsWriter {
 
         // Izgradi početni YAML
         let mut map = serde_yaml::Mapping::new();
-        map.insert(Value::String("name".to_string()), Value::String(name.to_string()));
-        
+        map.insert(
+            Value::String("name".to_string()),
+            Value::String(name.to_string()),
+        );
+
         for (k, v) in template_data {
             map.insert(Value::String(k), Value::String(v));
         }
-        
+
         // Dodaj timestamp
         let now = chrono::Local::now().format("%Y-%m-%d").to_string();
         map.insert(Value::String("created_at".to_string()), Value::String(now));
 
         let yaml = Value::Mapping(map);
         let meta_path = project_path.join("meta.yaml");
-        
+
         fs::write(&meta_path, serde_yaml::to_string(&yaml)?)?;
-        
+
         info!("Created New Island: {}", name);
         Ok(())
     }
 }
-

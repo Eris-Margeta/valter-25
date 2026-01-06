@@ -1,12 +1,12 @@
-use rusqlite::{Connection, params, types::Value as SqlValue};
-use uuid::Uuid;
 use crate::config::Config;
-use anyhow::{Result, Context};
-use tracing::{info, debug, warn};
-use std::sync::Mutex;
+use anyhow::{Context, Result};
+use rusqlite::{params, types::Value as SqlValue, Connection};
+use serde_json::{Map, Value as JsonValue};
 use std::collections::{HashMap, HashSet};
-use serde_json::{Value as JsonValue, Map};
+use std::sync::Mutex;
 use strsim::levenshtein;
+use tracing::{debug, info, warn};
+use uuid::Uuid;
 
 #[allow(dead_code)]
 pub struct SqliteManager {
@@ -24,22 +24,25 @@ pub enum EntityStatus {
 impl SqliteManager {
     pub fn new(path: &str) -> Result<Self> {
         let conn = Connection::open(path).context("Failed to open SQLite DB")?;
-        
+
         // FIX: PRAGMA journal_mode returns a row ("wal"), so execute() fails.
         // We use query_row to consume that result.
-        let _ : String = conn.query_row("PRAGMA journal_mode=WAL", [], |row| row.get(0))
+        let _: String = conn
+            .query_row("PRAGMA journal_mode=WAL", [], |row| row.get(0))
             .unwrap_or("delete".to_string());
-            
+
         // synchronous=NORMAL doesn't return rows usually, but let's be safe via execute is fine usually,
         // but strictly speaking some pragmas do return. synchronous usually doesn't.
         conn.execute("PRAGMA synchronous=NORMAL", [])?;
-        
-        Ok(Self { conn: Mutex::new(conn) })
+
+        Ok(Self {
+            conn: Mutex::new(conn),
+        })
     }
 
     pub fn init_schema(&self, config: &Config) -> Result<()> {
         let conn = self.conn.lock().unwrap();
-        
+
         // 0. SYSTEM METADATA (Versioning)
         conn.execute(
             "CREATE TABLE IF NOT EXISTS _valter_system (key TEXT PRIMARY KEY, value TEXT)",
@@ -59,27 +62,27 @@ impl SqliteManager {
         // 2. ISLANDS (Dynamic Migration)
         for island_def in &config.islands {
             let mut virtual_fields = Vec::new();
-            
+
             // Standard fields for every island
             // Note: We handle these manually inside ensure_table logic or define them here implicitly?
             // Let's create a definition for ensure_table to use.
-            
+
             // Relations -> Text Columns
             for rel in &island_def.relations {
-                virtual_fields.push(crate::config::CloudField { 
-                    key: rel.field.clone(), 
-                    field_type: "string".to_string(), 
-                    required: false, 
-                    options: None 
+                virtual_fields.push(crate::config::CloudField {
+                    key: rel.field.clone(),
+                    field_type: "string".to_string(),
+                    required: false,
+                    options: None,
                 });
             }
             // Aggregations -> Number Columns
             for agg in &island_def.aggregations {
-                virtual_fields.push(crate::config::CloudField { 
-                    key: agg.name.clone(), 
-                    field_type: "number".to_string(), 
-                    required: false, 
-                    options: None 
+                virtual_fields.push(crate::config::CloudField {
+                    key: agg.name.clone(),
+                    field_type: "number".to_string(),
+                    required: false,
+                    options: None,
                 });
             }
 
@@ -106,11 +109,17 @@ impl SqliteManager {
     }
 
     // Helper za pametnu migraciju (CREATE or ALTER)
-    fn ensure_table(&self, conn: &Connection, table_name: &str, fields: &[crate::config::CloudField], is_island: bool) -> Result<()> {
+    fn ensure_table(
+        &self,
+        conn: &Connection,
+        table_name: &str,
+        fields: &[crate::config::CloudField],
+        is_island: bool,
+    ) -> Result<()> {
         // 1. Base columns
         let mut expected_cols = HashMap::new();
         expected_cols.insert("id".to_string(), "TEXT PRIMARY KEY".to_string());
-        
+
         if is_island {
             expected_cols.insert("name".to_string(), "TEXT".to_string());
             expected_cols.insert("path".to_string(), "TEXT".to_string());
@@ -128,11 +137,14 @@ impl SqliteManager {
         }
 
         // 2. Check if table exists
-        let table_exists: bool = conn.query_row(
-            "SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?",
-            params![table_name],
-            |row| row.get(0),
-        ).unwrap_or(0) > 0;
+        let table_exists: bool = conn
+            .query_row(
+                "SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?",
+                params![table_name],
+                |row| row.get(0),
+            )
+            .unwrap_or(0)
+            > 0;
 
         if !table_exists {
             // Create Table
@@ -146,18 +158,25 @@ impl SqliteManager {
         } else {
             // Migrate (Check missing columns)
             let mut stmt = conn.prepare(&format!("PRAGMA table_info({})", table_name))?;
-            let existing_cols: HashSet<String> = stmt.query_map([], |row| row.get::<_, String>(1))?
+            let existing_cols: HashSet<String> = stmt
+                .query_map([], |row| row.get::<_, String>(1))?
                 .filter_map(|r| r.ok())
                 .collect();
 
             for (col, type_def) in &expected_cols {
                 if !existing_cols.contains(col) {
                     // ALTER TABLE ADD COLUMN
-                    // Note: SQLite allows adding columns but primary keys/not nulls have restrictions. 
+                    // Note: SQLite allows adding columns but primary keys/not nulls have restrictions.
                     // We assume nullable or default for new columns to be safe.
                     let clean_type = type_def.replace("PRIMARY KEY", ""); // Can't add PK via Alter
-                    let query = format!("ALTER TABLE {} ADD COLUMN {} {}", table_name, col, clean_type);
-                    info!("Database: Migrating '{}' -> Adding column '{}'", table_name, col);
+                    let query = format!(
+                        "ALTER TABLE {} ADD COLUMN {} {}",
+                        table_name, col, clean_type
+                    );
+                    info!(
+                        "Database: Migrating '{}' -> Adding column '{}'",
+                        table_name, col
+                    );
                     if let Err(e) = conn.execute(&query, []) {
                         warn!("Failed to migrate column {}.{}: {}", table_name, col, e);
                     }
@@ -167,7 +186,13 @@ impl SqliteManager {
         Ok(())
     }
 
-    pub fn check_or_create_pending(&self, table: &str, key_field: &str, value: &str, context_info: &str) -> Result<EntityStatus> {
+    pub fn check_or_create_pending(
+        &self,
+        table: &str,
+        key_field: &str,
+        value: &str,
+        context_info: &str,
+    ) -> Result<EntityStatus> {
         let conn = self.conn.lock().unwrap();
 
         let query_exact = format!("SELECT id FROM {} WHERE {} = ?", table, key_field);
@@ -191,8 +216,8 @@ impl SqliteManager {
         let mut suggestions = Vec::new();
         // Catch error if table/column doesn't exist yet (safety check)
         if let Ok(mut stmt) = conn.prepare(&format!("SELECT {} FROM {}", key_field, table)) {
-             let names_iter = stmt.query_map([], |row| row.get::<_, String>(0))?;
-             for name_res in names_iter {
+            let names_iter = stmt.query_map([], |row| row.get::<_, String>(0))?;
+            for name_res in names_iter {
                 if let Ok(existing_name) = name_res {
                     let dist = levenshtein(value, &existing_name);
                     if dist > 0 && dist <= 3 {
@@ -210,10 +235,24 @@ impl SqliteManager {
             INSERT INTO pending_actions (id, type, target_table, key_field, value, context, suggestions, status, created_at)
             VALUES (?, 'CreateEntity', ?, ?, ?, ?, ?, 'Pending', ?)
         ";
-        conn.execute(insert_sql, params![action_id, table, key_field, value, context_info, suggestions_json, now])?;
+        conn.execute(
+            insert_sql,
+            params![
+                action_id,
+                table,
+                key_field,
+                value,
+                context_info,
+                suggestions_json,
+                now
+            ],
+        )?;
 
-        info!("Safety Valve: '{}' not found in {}. Action Created.", value, table);
-        
+        info!(
+            "Safety Valve: '{}' not found in {}. Action Created.",
+            value, table
+        );
+
         if suggestions.is_empty() {
             Ok(EntityStatus::Pending(()))
         } else {
@@ -226,7 +265,9 @@ impl SqliteManager {
         let tx = conn.transaction()?;
 
         let (table, key_field, value): (String, String, String) = {
-            let mut stmt = tx.prepare("SELECT target_table, key_field, value FROM pending_actions WHERE id = ?")?;
+            let mut stmt = tx.prepare(
+                "SELECT target_table, key_field, value FROM pending_actions WHERE id = ?",
+            )?;
             let mut rows = stmt.query(params![action_id])?;
             if let Some(row) = rows.next()? {
                 (row.get(0)?, row.get(1)?, row.get(2)?)
@@ -237,9 +278,12 @@ impl SqliteManager {
 
         let new_id = Uuid::new_v4().to_string();
         let query_insert = format!("INSERT INTO {} (id, {}) VALUES (?, ?)", table, key_field);
-        
+
         tx.execute(&query_insert, params![new_id, value])?;
-        tx.execute("UPDATE pending_actions SET status = 'Resolved' WHERE id = ?", params![action_id])?;
+        tx.execute(
+            "UPDATE pending_actions SET status = 'Resolved' WHERE id = ?",
+            params![action_id],
+        )?;
 
         tx.commit()?;
         info!("Approved & Created: {} (ID: {})", value, new_id);
@@ -248,16 +292,21 @@ impl SqliteManager {
 
     pub fn reject_pending_action(&self, action_id: &str) -> Result<()> {
         let conn = self.conn.lock().unwrap();
-        conn.execute("UPDATE pending_actions SET status = 'Rejected' WHERE id = ?", params![action_id])?;
+        conn.execute(
+            "UPDATE pending_actions SET status = 'Rejected' WHERE id = ?",
+            params![action_id],
+        )?;
         info!("Action Rejected: {}", action_id);
         Ok(())
     }
 
     pub fn upsert_island(
-        &self, 
-        table: &str, name: &str, path: &str,
+        &self,
+        table: &str,
+        name: &str,
+        path: &str,
         relations: &HashMap<String, Option<String>>,
-        aggregations: &HashMap<String, f64>
+        aggregations: &HashMap<String, f64>,
     ) -> Result<()> {
         let conn = self.conn.lock().unwrap();
 
@@ -265,28 +314,50 @@ impl SqliteManager {
         let project_id: String = {
             let mut stmt = conn.prepare(&query_select)?;
             let mut rows = stmt.query(params![name])?;
-            if let Some(row) = rows.next()? { row.get(0)? } else { Uuid::new_v4().to_string() }
+            if let Some(row) = rows.next()? {
+                row.get(0)?
+            } else {
+                Uuid::new_v4().to_string()
+            }
         };
 
-        conn.execute(&format!("DELETE FROM {} WHERE id = ?", table), params![project_id])?;
+        conn.execute(
+            &format!("DELETE FROM {} WHERE id = ?", table),
+            params![project_id],
+        )?;
 
-        let mut final_cols = vec!["id".to_string(), "name".to_string(), "path".to_string(), "updated_at".to_string()];
+        let mut final_cols = vec![
+            "id".to_string(),
+            "name".to_string(),
+            "path".to_string(),
+            "updated_at".to_string(),
+        ];
         let now = chrono::Local::now().to_rfc3339();
-        let mut final_vals = vec![format!("'{}'", project_id), format!("'{}'", name), format!("'{}'", path), format!("'{}'", now)];
-        
+        let mut final_vals = vec![
+            format!("'{}'", project_id),
+            format!("'{}'", name),
+            format!("'{}'", path),
+            format!("'{}'", now),
+        ];
+
         for (k, v) in relations {
-             final_cols.push(k.clone());
-             match v {
-                 Some(uuid) => final_vals.push(format!("'{}'", uuid)),
-                 None => final_vals.push("NULL".to_string()),
-             }
+            final_cols.push(k.clone());
+            match v {
+                Some(uuid) => final_vals.push(format!("'{}'", uuid)),
+                None => final_vals.push("NULL".to_string()),
+            }
         }
         for (k, v) in aggregations {
-             final_cols.push(k.clone());
-             final_vals.push(format!("{}", v));
+            final_cols.push(k.clone());
+            final_vals.push(format!("{}", v));
         }
 
-        let query = format!("INSERT INTO {} ({}) VALUES ({})", table, final_cols.join(", "), final_vals.join(", "));
+        let query = format!(
+            "INSERT INTO {} ({}) VALUES ({})",
+            table,
+            final_cols.join(", "),
+            final_vals.join(", ")
+        );
         conn.execute(&query, [])?;
         Ok(())
     }
@@ -294,48 +365,59 @@ impl SqliteManager {
     pub fn fetch_pending_actions(&self) -> Result<Vec<JsonValue>> {
         let conn = self.conn.lock().unwrap();
         // Možda tablica ne postoji pri prvom runu ako config nije učitan, pa handle gracefully
-        let mut stmt = match conn.prepare("SELECT * FROM pending_actions WHERE status = 'Pending'") {
+        let mut stmt = match conn.prepare("SELECT * FROM pending_actions WHERE status = 'Pending'")
+        {
             Ok(s) => s,
-            Err(_) => return Ok(vec![])
+            Err(_) => return Ok(vec![]),
         };
-        
-        let col_names: Vec<String> = stmt.column_names().into_iter().map(|s| s.to_string()).collect();
+
+        let col_names: Vec<String> = stmt
+            .column_names()
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect();
         let rows = stmt.query_map([], |row| {
-             let mut map = Map::new();
-             for i in 0..col_names.len() {
-                 let val: SqlValue = row.get(i)?;
-                 let json_val = match val {
+            let mut map = Map::new();
+            for i in 0..col_names.len() {
+                let val: SqlValue = row.get(i)?;
+                let json_val = match val {
                     SqlValue::Text(s) => {
                         if col_names[i] == "suggestions" {
-                             serde_json::from_str(&s).unwrap_or(JsonValue::String(s))
+                            serde_json::from_str(&s).unwrap_or(JsonValue::String(s))
                         } else {
-                             JsonValue::String(s)
+                            JsonValue::String(s)
                         }
-                    },
+                    }
                     SqlValue::Null => JsonValue::Null,
-                    _ => JsonValue::String("Unknown".to_string())
-                 };
-                 map.insert(col_names[i].clone(), json_val);
-             }
-             Ok(JsonValue::Object(map))
+                    _ => JsonValue::String("Unknown".to_string()),
+                };
+                map.insert(col_names[i].clone(), json_val);
+            }
+            Ok(JsonValue::Object(map))
         })?;
 
         let mut res = Vec::new();
-        for r in rows { res.push(r?); }
+        for r in rows {
+            res.push(r?);
+        }
         Ok(res)
     }
 
     pub fn fetch_all_dynamic(&self, table: &str) -> Result<Vec<JsonValue>> {
         let conn = self.conn.lock().unwrap();
         let query = format!("SELECT * FROM {}", table);
-        
+
         // Handle case where table doesn't exist yet
         let mut stmt = match conn.prepare(&query) {
             Ok(s) => s,
-            Err(_) => return Ok(vec![])
+            Err(_) => return Ok(vec![]),
         };
-        
-        let col_names: Vec<String> = stmt.column_names().into_iter().map(|s| s.to_string()).collect();
+
+        let col_names: Vec<String> = stmt
+            .column_names()
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect();
         let rows = stmt.query_map([], |row| {
             let mut map = Map::new();
             for i in 0..col_names.len() {
@@ -343,7 +425,13 @@ impl SqliteManager {
                 let json_val = match val {
                     SqlValue::Null => JsonValue::Null,
                     SqlValue::Integer(i) => JsonValue::Number(i.into()),
-                    SqlValue::Real(f) => if let Some(n) = serde_json::Number::from_f64(f) { JsonValue::Number(n) } else { JsonValue::Null },
+                    SqlValue::Real(f) => {
+                        if let Some(n) = serde_json::Number::from_f64(f) {
+                            JsonValue::Number(n)
+                        } else {
+                            JsonValue::Null
+                        }
+                    }
                     SqlValue::Text(s) => JsonValue::String(s),
                     SqlValue::Blob(_) => JsonValue::String("<BINARY>".to_string()),
                 };
@@ -351,10 +439,11 @@ impl SqliteManager {
             }
             Ok(JsonValue::Object(map))
         })?;
-        
+
         let mut results = Vec::new();
-        for r in rows { results.push(r?); }
+        for r in rows {
+            results.push(r?);
+        }
         Ok(results)
     }
 }
-

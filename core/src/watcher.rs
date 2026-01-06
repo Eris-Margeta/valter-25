@@ -1,8 +1,8 @@
+use anyhow::Result;
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher as NotifyWatcher};
 use std::path::Path;
 use tokio::sync::mpsc;
-use anyhow::Result;
-use tracing::{info, error};
+use tracing::{error, info};
 
 pub struct Watcher {
     // We keep the watcher alive here
@@ -13,19 +13,19 @@ pub struct Watcher {
 impl Watcher {
     pub fn new(path: &str, tx: mpsc::Sender<Event>) -> Result<Self> {
         let (std_tx, std_rx) = std::sync::mpsc::channel();
-        
+
         let mut watcher = RecommendedWatcher::new(std_tx, Config::default())?;
-        
+
         // Ensure the path exists before watching, or handle error gracefully
         if !Path::new(path).exists() {
-             // For now, let's just warn and maybe create it or fail? 
-             // The plan says "Create a temp directory, modify a file..." so we should probably ensure it exists.
-             // But for the general case, we should fail if the root path doesn't exist.
-             // However, for testing I might want to create it.
-             // Let's assume it exists for now as per "Green field (Empty Folder)" might mean project root.
-             // I'll watch "." if path is invalid for now, or just fail.
+            // For now, let's just warn and maybe create it or fail?
+            // The plan says "Create a temp directory, modify a file..." so we should probably ensure it exists.
+            // But for the general case, we should fail if the root path doesn't exist.
+            // However, for testing I might want to create it.
+            // Let's assume it exists for now as per "Green field (Empty Folder)" might mean project root.
+            // I'll watch "." if path is invalid for now, or just fail.
         }
-        
+
         watcher.watch(Path::new(path), RecursiveMode::Recursive)?;
 
         // Spawn a task to bridge std::mpsc to tokio::mpsc
@@ -35,7 +35,7 @@ impl Watcher {
             // Actually, std_rx.recv() blocks. Doing this in a simple tokio::spawn might block the executor thread if not careful,
             // but for a dedicated loop it's better to use spawn_blocking or a separate std::thread.
             // Let's use a separate std::thread for the bridge to be safe.
-             std::thread::spawn(move || {
+            std::thread::spawn(move || {
                 while let Ok(res) = std_rx.recv() {
                     match res {
                         Ok(event) => {
