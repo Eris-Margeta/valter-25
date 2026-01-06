@@ -1,50 +1,83 @@
-name: Repo Sync & Ops
+name: CI
 
 on:
   push:
-    branches: [ "main", "master" ]
-    paths:
-      - 'README.md'
-      - 'meta.yaml' # Ažurirano da prati i meta.yaml
-      - 'VALTER-INTERNAL/RADNI-NALOZI/**'
+    branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
-  # 1. Sinkronizacija Metadataka (Opis, Homepage)
-  sync-metadata:
+  build-dashboard:
+    name: Build Dashboard (React)
     runs-on: ubuntu-latest
-    permissions:
-      # ISPRAVAK: 'repository: write' je nevažeći ključ. 'contents: write' je ispravno.
-      contents: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
       
-      - name: Install yq
-        run: sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && sudo chmod +x /usr/bin/yq
-
-      - name: Update Repo Info from meta.yaml
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # 1. Izvuci opis i homepage URL iz meta.yaml
-          DESCRIPTION=$(yq e '.description' meta.yaml)
-          HOMEPAGE=$(yq e '.homepage' meta.yaml) # Koristimo novo 'homepage' polje
-          
-          # 3. Ažuriraj GitHub putem CLI-a
-          echo "Updating description to: $DESCRIPTION"
-          echo "Updating homepage to: $HOMEPAGE"
-          gh repo edit --description "$DESCRIPTION" --homepage "$HOMEPAGE" --enable-issues=true --enable-projects=true
-
-  # 2. Sinkronizacija Radnih Naloga (Issues)
-  sync-issues:
-    runs-on: ubuntu-latest
-    permissions:
-      issues: write
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Convert TODOs to Issues
-        uses: alstr/todo-to-issue-action@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
         with:
-          CLOSE_ISSUES: "true" # Ako obrišeš TODO, zatvara Issue
-          AUTO_ASSIGN: "true"
+          version: 10
+
+      # DEBUG KORAK: Ovaj korak će izlistati sve datoteke u projektu.
+      # U logovima ovog koraka provjeri postoji li 'dashboard/pnpm-lock.yaml'.
+      - name: List files in the repository
+        run: ls -R
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+          cache-dependency-path: 'dashboard/pnpm-lock.yaml'
+      
+      - name: Install Dependencies
+        working-directory: ./dashboard
+        run: pnpm install --frozen-lockfile
+      
+      - name: Build
+        working-directory: ./dashboard
+        run: pnpm build
+
+      - name: Upload dashboard artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-dist
+          path: dashboard/dist
+
+  test-core:
+    name: Test Core (Rust)
+    runs-on: ubuntu-latest
+    needs: build-dashboard
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Download dashboard artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dashboard-dist
+          path: dashboard/dist
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            core/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Check code
+        working-directory: ./core
+        run: cargo check
+      
+      - name: Run tests
+        working-directory: ./core
+        run: cargo test
