@@ -15,27 +15,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v4
         with:
-          version: 8
+          version: 10
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: 'pnpm'
-          # ISPRAVAK: Postavljamo radni direktorij za sve pnpm korake
+          # VAŽNO: Ovaj korak zahtijeva da 'dashboard/pnpm-lock.yaml' postoji u repozitoriju.
           cache-dependency-path: 'dashboard/pnpm-lock.yaml'
       
       - name: Install Dependencies
         working-directory: ./dashboard
-        run: pnpm install
+        run: pnpm install --frozen-lockfile # Koristimo --frozen-lockfile u CI za strogu provjeru
       
       - name: Build
         working-directory: ./dashboard
         run: pnpm build
 
-      # ISPRAVAK: Spremamo 'dist' folder kao artefakt
       - name: Upload dashboard artifact
         uses: actions/upload-artifact@v4
         with:
@@ -45,12 +44,10 @@ jobs:
   test-core:
     name: Test Core (Rust)
     runs-on: ubuntu-latest
-    # ISPRAVAK: Ovaj posao ovisi o uspješnom završetku 'build-dashboard'
     needs: build-dashboard
     steps:
       - uses: actions/checkout@v4
       
-      # ISPRAVAK: Preuzimamo 'dist' folder prije builda
       - name: Download dashboard artifact
         uses: actions/download-artifact@v4
         with:
@@ -70,7 +67,9 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       
       - name: Check
-        run: cd core && cargo check
+        working-directory: ./core
+        run: cargo check
       
       - name: Test
-        run: cd core && cargo test
+        working-directory: ./core
+        run: cargo test
