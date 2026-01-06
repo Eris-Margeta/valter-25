@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Terminal, LayoutDashboard, Database, Folder, MessageSquare, Layers, RefreshCw } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { LayoutDashboard, Database, Folder, MessageSquare, Layers, RefreshCw } from 'lucide-react';
 import { graphqlRequest, QUERIES } from './api';
 import type { AppConfig, PendingAction } from './types';
 import { DynamicTable } from './components/DynamicTable';

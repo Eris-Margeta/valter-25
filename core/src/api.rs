@@ -2,11 +2,10 @@ use async_graphql::{Context, EmptySubscription, Object, Schema, Json};
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
 use axum::{
     extract::Extension,
-    response::{Html, IntoResponse, Response},
+    response::{Html, IntoResponse},
     routing::get,
     Router,
     http::{StatusCode, header, Uri},
-    body::Body,
 };
 use tower_http::cors::{Any, CorsLayer};
 use tokio::net::TcpListener;
@@ -14,12 +13,12 @@ use crate::cloud::SqliteManager;
 use crate::config::Config;
 use crate::fs_writer::FsWriter;
 use std::sync::Arc;
-use tracing::{info};
+use tracing::info;
 use serde_json::Value;
 use std::path::Path;
 use rust_embed::RustEmbed;
 
-// Ugrađujemo dist folder iz dashboarda
+// Ugrađujemo dist folder iz dashboarda (Frontend)
 #[derive(RustEmbed)]
 #[folder = "../dashboard/dist"]
 struct Assets;
@@ -28,6 +27,10 @@ pub struct ApiState {
     pub cloud: Arc<SqliteManager>,
     pub config: Arc<Config>,
 }
+
+// --- GRAPHQL DEFINICIJE ---
+
+pub struct QueryRoot;
 
 #[Object]
 impl QueryRoot {
@@ -99,6 +102,7 @@ impl MutationRoot {
     async fn update_island_field(&self, ctx: &Context<'_>, island_type: String, island_name: String, key: String, value: String) -> String {
         let state = ctx.data::<ApiState>().expect("ApiState missing");
         if let Ok(rows) = state.cloud.fetch_all_dynamic(&island_type) {
+            // Find by name in SQL, get path, update FS
             if let Some(row) = rows.iter().find(|r| r.get("name").and_then(|v| v.as_str()) == Some(&island_name)) {
                 if let Some(path_str) = row.get("path").and_then(|v| v.as_str()) {
                     let meta_path = Path::new(path_str).join("meta.yaml");
@@ -140,6 +144,8 @@ impl MutationRoot {
     }
 }
 
+// --- HANDLERS ---
+
 pub type ValterSchema = Schema<QueryRoot, MutationRoot, EmptySubscription>;
 
 async fn graphql_handler(schema: Extension<ValterSchema>, req: GraphQLRequest) -> GraphQLResponse {
@@ -150,31 +156,7 @@ async fn graphiql() -> impl IntoResponse {
     Html(async_graphql::http::playground_source(async_graphql::http::GraphQLPlaygroundConfig::new("/graphql")))
 }
 
-pub async fn start_server(cloud: Arc<SqliteManager>, config: Arc<Config>) -> anyhow::Result<()> {
-    let schema = Schema::build(QueryRoot, MutationRoot, EmptySubscription)
-        .data(ApiState { cloud, config: config.clone() })
-        .finish();
-
-    let cors = CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any);
-    let app = Router::new()
-        .route("/graphql", get(graphiql).post(graphql_handler))
-        .layer(Extension(schema))
-        .layer(cors);
-
-    // NOVO: Čitamo port iz configa
-    let port = config.global.port;
-    let addr = format!("0.0.0.0:{}", port);
-    
-    info!("GraphiQL IDE: http://localhost:{}/graphql", port);
-    
-    let listener = TcpListener::bind(&addr).await?;
-    axum::serve(listener, app).await?;
-    Ok(())
-}
-
-
-// --- STATIC FILE HANDLER ---
-
+// Servira React Frontend (Embedded)
 async fn static_handler(uri: Uri) -> impl IntoResponse {
     let mut path = uri.path().trim_start_matches('/').to_string();
 
@@ -188,8 +170,7 @@ async fn static_handler(uri: Uri) -> impl IntoResponse {
             ([(header::CONTENT_TYPE, mime.as_ref())], content.data).into_response()
         }
         None => {
-            // SPA Routing Fallback: Ako file ne postoji, vrati index.html
-            // Ovo omogućuje da React Router radi na refresh
+            // SPA Fallback -> index.html
             if let Some(content) = Assets::get("index.html") {
                 let mime = mime_guess::from_path("index.html").first_or_octet_stream();
                 ([(header::CONTENT_TYPE, mime.as_ref())], content.data).into_response()
@@ -200,18 +181,7 @@ async fn static_handler(uri: Uri) -> impl IntoResponse {
     }
 }
 
-pub type ValterSchema = Schema<QueryRoot, MutationRoot, EmptySubscription>;
-
-async fn graphql_handler(schema: Extension<ValterSchema>, req: GraphQLRequest) -> GraphQLResponse {
-    schema.execute(req.into_inner()).await.into()
-}
-
-async fn graphiql() -> impl IntoResponse {
-    Html(async_graphql::http::playground_source(async_graphql::http::GraphQLPlaygroundConfig::new("/graphql")))
-}
-
-
-// --- START SERVER UPDATE ---
+// --- SERVER STARTUP ---
 
 pub async fn start_server(cloud: Arc<SqliteManager>, config: Arc<Config>) -> anyhow::Result<()> {
     let schema = Schema::build(QueryRoot, MutationRoot, EmptySubscription)
@@ -222,8 +192,7 @@ pub async fn start_server(cloud: Arc<SqliteManager>, config: Arc<Config>) -> any
     
     let app = Router::new()
         .route("/graphql", get(graphiql).post(graphql_handler))
-        // Sve ostalo ide na static handler (Frontend)
-        .fallback(static_handler)
+        .fallback(static_handler) // Serve Frontend for any other route
         .layer(Extension(schema))
         .layer(cors);
 

@@ -1,5 +1,4 @@
-import React from 'react';
-import { AlertTriangle, Check, X, GitMerge, ArrowRight } from 'lucide-react';
+import { AlertTriangle, GitMerge, ArrowRight } from 'lucide-react';
 import type { PendingAction } from '../types';
 import { graphqlRequest, MUTATIONS } from '../api';
 

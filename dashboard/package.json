@@ -1,7 +1,7 @@
 {
-  "name": "web",
+  "name": "valter-dashboard",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -35,5 +35,8 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [ "esbuild" ]
   }
 }
