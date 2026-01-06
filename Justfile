@@ -73,7 +73,7 @@ install:
     mkdir -p ~/.local/bin
     
     @echo "🚚 Installing Binary..."
-    cp core/target/release/valter ~/.local/bin/valter
+    cp target/release/valter ~/.local/bin/valter
     
     @# MACOS SIGNING FIX
     @if [ "$(uname)" = "Darwin" ]; then \
@@ -97,7 +97,7 @@ update:
     cargo build --release --manifest-path core/Cargo.toml
     
     @echo "🚚 Copying binary..."
-    cp core/target/release/valter ~/.local/bin/valter
+    cp target/release/valter ~/.local/bin/valter
     
     @if [ "$(uname)" = "Darwin" ]; then \
         echo "🍎 macOS detected: Signing binary..."; \
