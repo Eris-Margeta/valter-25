@@ -96,6 +96,14 @@ async fn main() -> Result<()> {
                 .write(true)
                 .append(true)
                 .open(&log_path)?;
+                        let config_path = target_home.join("valter.config");
+            let port = if config_path.exists() {
+                if let Ok(content) = fs::read_to_string(&config_path) {
+                    if let Ok(cfg) = serde_yaml::from_str::<Config>(&content) {
+                        cfg.global.port
+                    } else { 9090 }
+                } else { 9090 }
+            } else { 9090 };
 
             let exe = env::current_exe()?;
             
