@@ -13,10 +13,26 @@
 #    to scan the 'dev-projects-folder'.
 # ---------------------------------------------------------
 
+# VALTER CONFIGURATION TEMPLATE
+# ---------------------------------------------------------
+# HOW TO USE THIS FILE:
+#
+# 1. FOR SYSTEM INSTALLATION (~/.valter):
+#    Rename this file to 'valter.config'.
+#    Place it in your VALTER_HOME (usually ~/.valter/).
+#    This config will be used when you run 'valter' globally.
+#
+# 2. FOR LOCAL DEVELOPMENT (MONOREPO):
+#    Do NOT use this file directly if you are contributing to Valter.
+#    The repository uses 'valter.dev.config' which is already set up
+#    to scan the 'dev-projects-folder'.
+# ---------------------------------------------------------
+
 GLOBAL:
   company_name: "My Valter Company"
   currency_symbol: "€"
   locale: "en_US"
+  port: 9090 # <--- PRODUCTION PORT (Different from Dev)
 
 CLOUDS:
   - name: "Operator"
@@ -35,10 +51,8 @@ CLOUDS:
 
 ISLANDS:
   - name: "Project"
-    # POINT THIS TO YOUR ACTUAL WORK DIRECTORY
     root_path: "/Users/username/MyProjects/*"  
     meta_file: "meta.yaml" 
-    
     relations:
       - field: "operator"
         target_cloud: "Operator"

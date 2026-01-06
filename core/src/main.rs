@@ -8,6 +8,7 @@ mod processor;
 mod aggregator;
 mod fs_writer;
 
+use clap::{Parser, Subcommand};
 use config::Config;
 use watcher::Watcher;
 use cloud::SqliteManager;
@@ -17,19 +18,125 @@ use anyhow::Result;
 use tracing::{info, error};
 use tokio::sync::mpsc;
 use std::sync::Arc;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::env;
+use std::fs;
+use std::process;
+use nix::sys::signal::{self, Signal};
+use nix::unistd::Pid;
+
+// CLI Definition
+#[derive(Parser)]
+#[command(name = "valter")]
+#[command(about = "Valter ERP Daemon", long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Start the daemon in the background (Production Mode)
+    Start,
+    /// Stop the running daemon
+    Stop,
+    /// Run in foreground
+    Run,
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Učitaj env vars ako postoje
     dotenv::dotenv().ok();
-    tracing_subscriber::fmt::init();
+
+    let cli = Cli::parse();
+
+    // 1. Helper za detekciju System Home-a (~/.valter)
+    let user_home = env::var("HOME").or_else(|_| env::var("USERPROFILE"))
+        .unwrap_or_else(|_| ".".to_string());
+    let default_system_home = PathBuf::from(user_home).join(".valter");
+
+    // 2. Trenutni VALTER_HOME (ako je postavljen)
+    let env_valter_home = env::var("VALTER_HOME").ok().map(PathBuf::from);
+
+    // Određujemo stvarni home za trenutni proces
+    let current_home = env_valter_home.clone().unwrap_or_else(|| PathBuf::from("."));
+    
+    // PID file lokacija
+    let pid_file_path = if env_valter_home.is_some() {
+        // Ako je forsiran system mode, pid je tamo
+        env_valter_home.unwrap().join("valter.pid")
+    } else if current_home.join("valter.dev.config").exists() {
+        // Dev mode root
+        PathBuf::from("valter.pid")
+    } else {
+        // Default system location
+        default_system_home.join("valter.pid")
+    };
+
+    match cli.command.unwrap_or(Commands::Run) {
+        Commands::Stop => {
+            return stop_daemon(&pid_file_path);
+        }
+        Commands::Start => {
+            println!("🚀 Initializing Valter Daemon...");
+            
+            // FORSIRAMO PRODUKCIJU:
+            // Ako korisnik nije eksplicitno postavio VALTER_HOME,
+            // mi ga postavljamo na ~/.valter za child proces.
+            let target_home = env_valter_home.unwrap_or(default_system_home);
+            
+            // Osiguraj da folder postoji
+            fs::create_dir_all(&target_home)?;
+
+            // Log file setup (Append mode)
+            let log_path = target_home.join("valter.log");
+            let log_file = fs::OpenOptions::new()
+                .create(true)
+                .write(true)
+                .append(true)
+                .open(&log_path)?;
+
+            let exe = env::current_exe()?;
+            
+            println!("   Home: {:?}", target_home);
+            println!("   Logs: {:?}", log_path);
+
+            process::Command::new(exe)
+                .arg("run") // Child runs in 'run' mode
+                .env("VALTER_HOME", &target_home) // FORCE ENV VAR
+                .stdout(log_file.try_clone()?) // Redirect stdout to file
+                .stderr(log_file) // Redirect stderr to file
+                .spawn()?; // Detached process
+            
+            println!("✅ Valter started in background.");
+            return Ok(());
+        }
+        Commands::Run => {
+            // Setup logging for the runner process
+            tracing_subscriber::fmt::init();
+            
+            // Write PID file
+            let pid = process::id();
+            if let Err(e) = fs::write(&pid_file_path, pid.to_string()) {
+                error!("Failed to write PID file to {:?}: {}", pid_file_path, e);
+            } else {
+                info!("PID: {} written to {:?}", pid, pid_file_path);
+            }
+            
+            // Nastavi na main logic...
+        }
+    }
+
+    // --- MAIN LOGIC (Foreground) ---
+    // Ovdje dolazimo samo ako je komanda 'Run' (ili default)
 
     info!("---------------------------------------------");
-    info!("   VALTER ERP - SYSTEM STARTUP v0.1.0");
+    info!("   VALTER ERP - DAEMON v0.1.0");
     info!("   Open Source Edition (MIT)");
     info!("---------------------------------------------");
 
+    // Ponovno evaluiramo mode jer nas je možda Start komanda pozvala s novim ENV
     let valter_home = env::var("VALTER_HOME").unwrap_or_else(|_| ".".to_string());
     let home_path = PathBuf::from(&valter_home);
     let is_system_mode = valter_home != ".";
@@ -40,29 +147,17 @@ async fn main() -> Result<()> {
         info!("Mode: DEVELOPMENT / LOCAL");
     }
 
-    // PRIORITY LIST FOR CONFIG:
-    // 1. System Mode: ~/.valter/valter.config
-    // 2. Dev Mode: ./valter.dev.config (Repo Root)
-    // 3. Dev Mode Fallback: ../valter.dev.config (If running from core/)
-    // 4. Legacy/Local: valter.config
-
+    // Config Loading Strategy
     let config_path = if is_system_mode && home_path.join("valter.config").exists() {
         home_path.join("valter.config")
     } else if PathBuf::from("valter.dev.config").exists() {
-        // Root run with dev config
         PathBuf::from("valter.dev.config")
     } else if PathBuf::from("../valter.dev.config").exists() {
-        // Core run with dev config in parent
         PathBuf::from("../valter.dev.config")
     } else if PathBuf::from("valter.config").exists() {
-        // Fallback
         PathBuf::from("valter.config")
-    } else if PathBuf::from("../valter.config").exists() {
-        // Fallback parent
-        PathBuf::from("../valter.config")
     } else {
         error!("CRITICAL: Configuration file not found.");
-        error!("Expected 'valter.dev.config' (Dev) or 'valter.config' (System).");
         return Err(anyhow::anyhow!("Config missing"));
     };
 
@@ -73,11 +168,12 @@ async fn main() -> Result<()> {
         },
         Err(e) => {
             error!("Config Parse Error: {}", e);
+            let _ = fs::remove_file(&pid_file_path);
             return Err(e);
         }
     };
 
-    // Database Location logic
+    // Database Setup
     let db_path = if is_system_mode {
         home_path.join("valter.db")
     } else if config_path.starts_with("..") {
@@ -87,29 +183,35 @@ async fn main() -> Result<()> {
     };
     
     let cloud = Arc::new(SqliteManager::new(db_path.to_str().unwrap())?);
-    cloud.init_schema(&config)?;
+    if let Err(e) = cloud.init_schema(&config) {
+        error!("DB Schema Error: {}", e);
+        let _ = fs::remove_file(&pid_file_path);
+        return Err(e);
+    }
 
+    // Oracle Generation
     if let Ok(tools) = ToolGenerator::generate_tools(&config) {
         let _ = serde_json::to_string(&tools);
     }
 
+    // API Server
     let cloud_clone = cloud.clone();
     let config_clone = config.clone();
     tokio::spawn(async move {
         if let Err(e) = api::start_server(cloud_clone, config_clone).await {
             error!("API Server failed: {}", e);
+            process::exit(1);
         }
     });
 
+    // Processor & Watcher
     let processor = EventProcessor::new(cloud.clone(), config.clone());
     
-    // Scan Root Logic:
-    // If we loaded valter.dev.config from root, we are likely in root.
-    // We should scan the path defined in config (handled by processor), 
-    // BUT Watcher needs a root to watch.
-    // If config says "./dev-projects-folder", watcher should probably watch "." to catch that folder.
-    
     let watch_root = if is_system_mode {
+        // U produkciji ne želimo nužno gledati home folder osim ako config ne kaže drugačije.
+        // Ali za sada, neka gleda home jer tamo može biti config.
+        // Još bolje: Gledajmo ono što piše u configu.
+        // Ali Watcher mora imati root path.
         valter_home.clone()
     } else if config_path.starts_with("..") {
         "..".to_string()
@@ -123,12 +225,37 @@ async fn main() -> Result<()> {
     let (tx, mut rx) = mpsc::channel(100);
     let _watcher = Watcher::new(&watch_root, tx)?;
 
-    info!("VALTER is Online. Dashboard at http://localhost:5173");
+    info!("VALTER Daemon is Running.");
 
     while let Some(event) = rx.recv().await {
         processor.handle_event(event).await;
     }
 
+    let _ = fs::remove_file(&pid_file_path);
+    Ok(())
+}
+
+fn stop_daemon(pid_path: &Path) -> Result<()> {
+    if !pid_path.exists() {
+        println!("Valter is not running (PID file not found at {:?}).", pid_path);
+        return Ok(());
+    }
+
+    let pid_str = fs::read_to_string(pid_path)?;
+    let pid_int: i32 = pid_str.trim().parse()?;
+    
+    println!("Stopping Valter process (PID: {})...", pid_int);
+    
+    match signal::kill(Pid::from_raw(pid_int), Signal::SIGTERM) {
+        Ok(_) => {
+            println!("Valter stopped successfully.");
+            let _ = fs::remove_file(pid_path);
+        }
+        Err(e) => {
+            println!("Failed to stop process: {}", e);
+            let _ = fs::remove_file(pid_path);
+        }
+    }
     Ok(())
 }
 

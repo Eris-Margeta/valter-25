@@ -27,4 +27,6 @@ dotenv = "0.15"
 chrono = "0.4"
 glob = "0.3"
 strsim = "0.10"
+clap = { version = "4.4", features = ["derive"] }
+nix = { version = "0.27", features = ["signal"] }
 

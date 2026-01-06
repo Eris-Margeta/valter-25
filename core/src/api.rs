@@ -12,7 +12,7 @@ use crate::cloud::SqliteManager;
 use crate::config::Config;
 use crate::fs_writer::FsWriter;
 use std::sync::Arc;
-use tracing::{info}; // Maknuli smo 'error' jer se ne koristi
+use tracing::{info};
 use serde_json::Value;
 use std::path::Path;
 
@@ -144,10 +144,9 @@ async fn graphiql() -> impl IntoResponse {
     Html(async_graphql::http::playground_source(async_graphql::http::GraphQLPlaygroundConfig::new("/graphql")))
 }
 
-// FIX: Sada primamo config kao argument, ne učitavamo ga ponovno
 pub async fn start_server(cloud: Arc<SqliteManager>, config: Arc<Config>) -> anyhow::Result<()> {
     let schema = Schema::build(QueryRoot, MutationRoot, EmptySubscription)
-        .data(ApiState { cloud, config })
+        .data(ApiState { cloud, config: config.clone() })
         .finish();
 
     let cors = CorsLayer::new().allow_origin(Any).allow_methods(Any).allow_headers(Any);
@@ -156,8 +155,13 @@ pub async fn start_server(cloud: Arc<SqliteManager>, config: Arc<Config>) -> any
         .layer(Extension(schema))
         .layer(cors);
 
-    info!("GraphiQL IDE: http://localhost:8000/graphql");
-    let listener = TcpListener::bind("0.0.0.0:8000").await?;
+    // NOVO: Čitamo port iz configa
+    let port = config.global.port;
+    let addr = format!("0.0.0.0:{}", port);
+    
+    info!("GraphiQL IDE: http://localhost:{}/graphql", port);
+    
+    let listener = TcpListener::bind(&addr).await?;
     axum::serve(listener, app).await?;
     Ok(())
 }

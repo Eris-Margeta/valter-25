@@ -9,18 +9,22 @@ default:
 
 # Run the full stack in Dev Mode (Monorepo root)
 dev:
+    @echo "🧹 Pre-flight: Killing zombies on ports 8000 & 5173..."
+    @-lsof -ti:8000 | xargs kill -9 2>/dev/null || true
+    @-lsof -ti:5173 | xargs kill -9 2>/dev/null || true
     @echo "🚀 Starting VALTER DEV Environment..."
-    @# Run Backend in background, then Frontend. Trap SIGINT to kill backend on Ctrl+C.
-    @trap 'kill %1' SIGINT; \
-    (cd core && cargo run) & \
+    @# Trap SIGINT (Ctrl+C) to run cleanup
+    @trap 'echo "\n🛑 Shutting down..."; lsof -ti:8000 | xargs kill -9 2>/dev/null; lsof -ti:5173 | xargs kill -9 2>/dev/null; exit 0' SIGINT; \
+    (cd core && cargo run -- run) & \
     (cd dashboard && pnpm dev)
+    @echo "Dashboard running on http://localhost:5173/"
+    wait
 
-# Clean build artifacts and temporary files
 clean:
     @echo "🧹 Cleaning up..."
     rm -rf target core/target
     rm -rf dashboard/dist dashboard/.vite dashboard/node_modules
-    rm -f valter.db valter.log
+    rm -f valter.db valter.log valter.pid valter.db-shm valter.db-wal
 
 # --- RELEASE ---
 
@@ -61,7 +65,8 @@ install:
     cp valter.config.example ~/.valter/valter.config
     
     @echo "✅ Installation Complete!"
-    @echo "   Run 'valter' to start the daemon."
+    @echo "   Use 'valter start' to run in background."
+    @echo "   Use 'valter stop' to shut down."
     @echo "   (Ensure ~/.local/bin is in your PATH)"
 
 # --- MAINTENANCE ---

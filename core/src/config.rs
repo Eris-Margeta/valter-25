@@ -19,6 +19,12 @@ pub struct GlobalConfig {
     pub company_name: String,
     pub currency_symbol: String,
     pub locale: String,
+    #[serde(default = "default_port")]
+    pub port: u16,
+}
+
+fn default_port() -> u16 {
+    8000
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
