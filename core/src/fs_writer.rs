@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 use serde_yaml::Value;
 use std::fs;
-use std::path::{Path, PathBuf};
-use tracing::{debug, info};
+use std::path::Path;
+use tracing::info;
 
 pub struct FsWriter;
 

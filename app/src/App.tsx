@@ -6,6 +6,7 @@ import { EntityList } from "./pages/EntityList";
 import { EntityDetail } from "./pages/EntityDetail";
 import { AppConfig, PendingAction } from "./types";
 import { graphqlRequest, MUTATIONS } from "./api";
+import { listen } from "@tauri-apps/api/event";
 
 function App() {
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -26,7 +27,17 @@ function App() {
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 2000);
-    return () => clearInterval(interval);
+
+    // Listen for Native Menu Events
+    const unlistenPromise = listen("menu-rescan", () => {
+      console.log("Native Rescan Event Received");
+      handleRescan();
+    });
+
+    return () => {
+      clearInterval(interval);
+      unlistenPromise.then((unlisten) => unlisten());
+    };
   }, []);
 
   const handleResolveAction = async (id: string, choice: "APPROVE" | "REJECT") => {
@@ -36,10 +47,8 @@ function App() {
   
   const handleMergeAction = async (action: PendingAction, suggestion: string) => {
     try {
-      // 1. Parse context to find the source error
       const ctx = JSON.parse(action.context);
       
-      // 2. Call mutation to fix the file
       await graphqlRequest(MUTATIONS.UPDATE_ISLAND_FIELD, {
         type: ctx.source_island_type,
         name: ctx.source_island_name, 
@@ -47,7 +56,6 @@ function App() {
         value: suggestion 
       });
 
-      // 3. Reject the pending action as it is now resolved via fix
       await graphqlRequest(MUTATIONS.RESOLVE_ACTION, { id: action.id, choice: 'REJECT' });
       
       fetchData();
@@ -57,7 +65,12 @@ function App() {
   };
 
   const handleRescan = async () => {
-    await graphqlRequest(MUTATIONS.RESCAN_ISLANDS);
+    try {
+      await graphqlRequest(MUTATIONS.RESCAN_ISLANDS);
+      alert("Rescan started.");
+    } catch (e) {
+      console.error("Rescan failed", e);
+    }
   };
 
   return (
@@ -77,11 +90,9 @@ function App() {
             }
           />
           
-          {/* Lists */}
           <Route path="/list/cloud/:name" element={<EntityList config={config} type="cloud" />} />
           <Route path="/list/island/:name" element={<EntityList config={config} type="island" />} />
           
-          {/* Details */}
           <Route path="/entity/cloud/:name/:id" element={<EntityDetail config={config} type="cloud" />} />
           <Route path="/entity/island/:name/:id" element={<EntityDetail config={config} type="island" />} />
           

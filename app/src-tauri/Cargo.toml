@@ -26,3 +26,5 @@ tauri-plugin-log = "2"
 valter = { path = "../../core" }
 tokio = { version = "1.0", features = ["full"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tauri-plugin-shell = "2.3.3"
+open = "5.3.3"
