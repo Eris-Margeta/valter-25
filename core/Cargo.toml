@@ -3,6 +3,14 @@ name = "valter"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "valter_core"
+path = "src/lib.rs"
+
+[[bin]]
+name = "valter"
+path = "src/main.rs"
+
 [dependencies]
 tokio = { version = "1.0", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
