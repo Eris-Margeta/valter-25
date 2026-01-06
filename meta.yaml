@@ -40,5 +40,7 @@ tags:
   - "System-Tool"
 
 # 5. LINKS
+# Podaci koje koristi GitHub Actions za sinkronizaciju repozitorija.
 repo: "https://github.com/Eris-Margeta/valter-25"
+homepage: "https://valter.dev" # DODANO: Polje za web stranicu
 license: "MIT"
