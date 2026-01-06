@@ -33,3 +33,10 @@ valter.config
 # 2. DO NOT IGNORE the development config (included in repo)
 !valter.dev.config
 
+# Database artifacts
+*.db
+*.db-shm
+*.db-wal
+*.log
+
+temp
