@@ -1,83 +1,55 @@
-name: CI
+name: Repo Sync & Ops
 
 on:
   push:
-    branches: [ "master", "main" ]
-  pull_request:
-    branches: [ "master", "main" ]
-
-env:
-  CARGO_TERM_COLOR: always
+    branches: [ "main", "master" ]
+    paths:
+      - 'README.md'
+      - 'meta.yaml'
+      - 'VALTER-INTERNAL/RADNI-NALOZI/**'
 
 jobs:
-  build-dashboard:
-    name: Build Dashboard (React)
+  # 1. Sinkronizacija Metadataka (Opis, Homepage)
+  sync-metadata:
     runs-on: ubuntu-latest
+    permissions:
+      # Ova dozvola je dobra praksa, ali stvarna autorizacija dolazi iz PAT-a
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
+      - name: Install yq for YAML parsing
+        run: sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && sudo chmod +x /usr/bin/yq
 
-      # DEBUG KORAK: Ovaj korak će izlistati sve datoteke u projektu.
-      # U logovima ovog koraka provjeri postoji li 'dashboard/pnpm-lock.yaml'.
-      - name: List files in the repository
-        run: ls -R
+      - name: Update Repo Info from meta.yaml
+        env:
+          # KLJUČNA ISPRAVKA: Koristimo Personal Access Token (PAT) umjesto GITHUB_TOKEN
+          # Ovaj token mora imati 'repo' scope i biti spremljen kao 'GH_PAT' u Repository Secrets.
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          # 1. Izvuci opis i homepage URL iz meta.yaml
+          DESCRIPTION=$(yq e '.description' meta.yaml)
+          HOMEPAGE=$(yq e '.homepage' meta.yaml)
+          
+          # 2. Ažuriraj GitHub putem CLI-a
+          echo "Updating description to: $DESCRIPTION"
+          echo "Updating homepage to: $HOMEPAGE"
+          gh repo edit --description "$DESCRIPTION" --homepage "$HOMEPAGE" --enable-issues=true --enable-projects=true
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: 'pnpm'
-          cache-dependency-path: 'dashboard/pnpm-lock.yaml'
-      
-      - name: Install Dependencies
-        working-directory: ./dashboard
-        run: pnpm install --frozen-lockfile
-      
-      - name: Build
-        working-directory: ./dashboard
-        run: pnpm build
-
-      - name: Upload dashboard artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: dashboard-dist
-          path: dashboard/dist
-
-  test-core:
-    name: Test Core (Rust)
+  # 2. Sinkronizacija Radnih Naloga (Issues)
+  sync-issues:
     runs-on: ubuntu-latest
-    needs: build-dashboard
+    permissions:
+      issues: write
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      - name: Download dashboard artifact
-        uses: actions/download-artifact@v4
+      - name: Convert TODOs to Issues
+        uses: alstr/todo-to-issue-action@v4
         with:
-          name: dashboard-dist
-          path: dashboard/dist
-
-      - name: Set up Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-      
-      - name: Cache Cargo dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            core/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      
-      - name: Check code
-        working-directory: ./core
-        run: cargo check
-      
-      - name: Run tests
-        working-directory: ./core
-        run: cargo test
+          # Uklonjeni su zastarjeli parametri
+          CLOSE_ISSUES: "true"
+          AUTO_ASSIGN: "true"
