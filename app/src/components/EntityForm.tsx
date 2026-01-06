@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { CloudDefinition, IslandDefinition } from "../types";
+import type { CloudDefinition, IslandDefinition } from "../types";
 import { Save, AlertCircle, Check } from "lucide-react";
 
 interface EntityFormProps {
@@ -19,11 +19,6 @@ export function EntityForm({ definition, data, onSave, readOnly = false }: Entit
 
   const handleChange = async (key: string, value: string) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
-    
-    // Auto-save on blur logic could go here, but for now we'll do direct update
-    // Or we can add a save button per field.
-    // Let's do "Enter to save" or onBlur for now? 
-    // The requirement says "It calls update_island_field on save".
   };
 
   const handleBlur = async (key: string, value: string) => {
@@ -41,21 +36,7 @@ export function EntityForm({ definition, data, onSave, readOnly = false }: Entit
     }
   };
 
-  // Helper to determine if it's a generic Cloud or an Island with known structure
-  const fields = 'fields' in definition ? definition.fields : []; 
-  // Note: Islands in valter.config don't strictly define 'fields' in the yaml currently shown in context 
-  // BUT the 'meta.yaml' inside them does. The config 'relations' and 'aggregations' help, but we might 
-  // need to rely on the DATA keys for islands if the config doesn't explicitly list fields yet.
-  
-  // However, for the purpose of this task, let's assume we can infer fields from data keys 
-  // or that we will map relations.
-  
-  // Actually, checking valter.dev.config: 
-  // CLOUDS have `fields`.
-  // ISLANDS don't have explicit `fields` list in config, they have `relations`.
-  // But the data returned from API for Islands corresponds to the meta.yaml content.
-
-  const renderField = (key: string, value: any, configField?: any) => {
+  const renderField = (key: string, value: any) => {
     const isEditing = status[key] === "saving";
     const isSuccess = status[key] === "success";
     const isError = status[key] === "error";
@@ -95,11 +76,10 @@ export function EntityForm({ definition, data, onSave, readOnly = false }: Entit
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Render explicitly defined fields for Clouds */}
         {'fields' in definition && definition.fields.map((f) => 
-           renderField(f.key, formData[f.key], f)
+           renderField(f.key, formData[f.key])
         )}
 
         {/* Render all data keys for Islands (since they lack explicit field config) */}
-        {/* We exclude internal keys like relations/aggregations if they appear as objects */}
         {!('fields' in definition) && Object.keys(formData).map((key) => {
              if (typeof formData[key] === 'object') return null; // Skip nested objects for now
              return renderField(key, formData[key]);

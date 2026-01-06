@@ -1,4 +1,4 @@
-import { AppConfig, PendingAction } from "../types";
+import type { AppConfig, PendingAction } from "../types";
 import { ActionCenter } from "../components/ActionCenter";
 import { Activity, Database, Folder } from "lucide-react";
 

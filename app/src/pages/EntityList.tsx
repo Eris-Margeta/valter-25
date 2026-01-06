@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { AppConfig } from "../types";
+import type { AppConfig } from "../types";
 import { DynamicTable } from "../components/DynamicTable";
 import { graphqlRequest } from "../api";
 

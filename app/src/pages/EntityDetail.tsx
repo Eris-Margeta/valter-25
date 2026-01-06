@@ -1,6 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { AppConfig } from "../types";
+import type { AppConfig } from "../types";
 import { EntityForm } from "../components/EntityForm";
 import { graphqlRequest } from "../api";
 import { ArrowLeft } from "lucide-react";

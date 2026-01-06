@@ -1,6 +1,6 @@
-import { Home, Database, Folder, Settings, Activity } from "lucide-react";
+import { Home, Database, Folder, Settings } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { AppConfig } from "../types";
+import type { AppConfig } from "../types";
 
 interface LayoutProps {
   children: React.ReactNode;

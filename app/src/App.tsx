@@ -4,7 +4,7 @@ import { Layout } from "./components/Layout";
 import { DashboardHome } from "./pages/DashboardHome";
 import { EntityList } from "./pages/EntityList";
 import { EntityDetail } from "./pages/EntityDetail";
-import { AppConfig, PendingAction } from "./types";
+import type { AppConfig, PendingAction } from "./types";
 import { graphqlRequest, MUTATIONS } from "./api";
 import { listen } from "@tauri-apps/api/event";
 
