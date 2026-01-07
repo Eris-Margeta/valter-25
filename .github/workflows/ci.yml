@@ -12,51 +12,16 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  lint-and-test-rust:
-    name: Lint & Test Rust (with Tauri Action)
-    runs-on: ubuntu-latest # Vraćamo se na standardni runner
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      
-      # === KLJUČNA PROMJENA: Koristimo službenu Tauri akciju ===
-      # Ova akcija će instalirati Rust, Node.js i SVE potrebne sistemske
-      # ovisnosti (poput GTK, WebKitGTK, itd.) za nas.
-      - name: Set up Tauri build environment
-        uses: tauri-apps/tauri-action@v0
-        with:
-          # Opcionalno, ali dobra praksa: specificiramo Node.js verziju
-          nodeVersion: '24'
-
-      # Caching je i dalje koristan za ubrzavanje preuzimanja Rust crateova
-      - name: Cache Cargo dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Check Formatting
-        run: cargo fmt --all -- --check
-
-      - name: Run Clippy Linter
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-
-      - name: Run Tests
-        run: cargo test --workspace --all-features
-
-  lint-and-build-frontend:
-    name: Lint & Build Frontend
+  lint-and-test:
+    # Vraćamo sve u jedan posao jer su ovisnosti sada povezane
+    name: Lint, Test & Build
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
       
+      # Korak 1: Postavi Node.js i pnpm (trebat će nam za build.rs)
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -68,15 +33,50 @@ jobs:
           node-version: 24
           cache: 'pnpm'
           cache-dependency-path: 'app/pnpm-lock.yaml'
+
+      # Korak 2: Koristimo ISPRAVNU akciju za instalaciju sistemskih ovisnosti
+      - name: Install Tauri system dependencies
+        uses: tauri-apps/setup-tauri@v1
       
-      - name: Install Dependencies
+      # Korak 3: Postavljamo Rust toolchain kao i prije
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      
+      # Korak 4: Caching za Cargo ovisnosti
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      # Korak 5: Sve naše provjere, sada u ispravnom okruženju
+
+      - name: Check Rust Formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run Clippy Linter
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+      - name: Run Rust Tests
+        run: cargo test --workspace --all-features
+
+      # Korak 6: Frontend provjere
+      
+      - name: Install Frontend Dependencies
         working-directory: ./app
         run: pnpm install --frozen-lockfile
       
-      - name: Run Linter
+      - name: Run Frontend Linter
         working-directory: ./app
         run: pnpm lint
       
-      - name: Build
+      - name: Build Frontend
         working-directory: ./app
         run: pnpm build
