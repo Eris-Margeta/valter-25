@@ -27,7 +27,6 @@ jobs:
         run: |
           apt-get update -y
           apt-get install -y --no-install-recommends \
-            # === ISPRAVAK: Ažurirano ime WebKitGTK paketa za Debian Trixie ===
             libwebkitgtk-6.0-dev \
             build-essential \
             pkg-config \
