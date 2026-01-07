@@ -13,10 +13,35 @@ env:
 
 jobs:
   lint-and-test-rust:
-    name: Lint & Test Rust
-    runs-on: ubuntu-latest
+    name: Lint & Test Rust (on Debian Trixie)
+    runs-on: ubuntu-latest # Runner je i dalje Ubuntu, ali koraci se izvršavaju u kontejneru
+
+    # Svi koraci ovog posla izvršavaju se unutar Debian Trixie (budući Debian 13) kontejnera.
+    container:
+      image: debian:trixie-slim
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      # Koraci se sada izvršavaju unutar Debian kontejnera
+      - name: Install System Dependencies (for Tauri on Debian)
+        run: |
+          # Ažuriramo apt i instaliramo sve što nam treba.
+          # Uklonili smo 'sudo' jer smo u kontejneru root korisnik.
+          # '--no-install-recommends' smanjuje veličinu instalacije.
+          apt-get update -y
+          apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.0-dev \
+            build-essential \
+            pkg-config \
+            libssl-dev \
+            libgtk-3-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            curl \
+            ca-certificates \
+            git
       
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
@@ -26,13 +51,12 @@ jobs:
       - name: Cache Cargo dependencies
         uses: actions/cache@v4
         with:
+          # Ažurirane putanje za cache unutar standardnog Docker/kontejner okruženja
           path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
+            /usr/local/cargo/registry
+            /usr/local/cargo/git
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-debian-trixie-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Check Formatting
         run: cargo fmt --all -- --check
@@ -47,12 +71,15 @@ jobs:
     name: Lint & Build Frontend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
         with:
           version: 10 # Usklađeno s vašim engineom
 
-      - name: Setup Node
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -63,13 +90,10 @@ jobs:
         working-directory: ./app
         run: pnpm install --frozen-lockfile
       
-      # === DODANI KORAK ===
       - name: Run Linter
         working-directory: ./app
         run: pnpm lint
       
       - name: Build
         working-directory: ./app
-        run: pnpm build```
-
-
+        run: pnpm build
