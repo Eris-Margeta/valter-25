@@ -32,7 +32,7 @@ chrono = { workspace = true }
 
 # Ostale specifične za core ostaju kako jesu (nismo ih micali u root jer ih app ne koristi)
 serde_yaml = "0.9"
-notify = "6.1"
+notify = "8.2"
 rusqlite = { version = "0.38.0", features = ["bundled"] }
 axum = "0.8"
 async-graphql = "7.1"

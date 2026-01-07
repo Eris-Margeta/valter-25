@@ -213,7 +213,7 @@ upgrade-deps:
     @echo "⬆️  Ažuriram Rust dependencije.."
     @cargo upgrade
 
-upgrade-deps-workspace:
+upgrade-check:
   @echo "⬆️  Tražim workspace sve upgradeove.."
-  @cargo upgrade --workspace --incompatible --verbose
+  @cargo outdated -w --root-deps-only
 
