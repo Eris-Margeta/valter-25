@@ -28,7 +28,7 @@ jobs:
           cache-dependency-path: 'app/pnpm-lock.yaml'
       
       - name: Install Dependencies
-        working-directory: ./dashboard
+        working-directory: ./app
         run: pnpm install --frozen-lockfile # Koristimo --frozen-lockfile u CI za strogu provjeru
       
       - name: Build
