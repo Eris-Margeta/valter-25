@@ -1,25 +1,26 @@
-name: Valter CI Pipeline
+# .github/workflows/ci.yml
+
+name: Valter CI Pipeline (Stable)
 
 on:
-  #push:
-  #  branches: [ "master", "main" ]
+  push:
+    branches: [ "master", "main" ]
   pull_request:
     branches: [ "master", "main" ]
 
-# Definiramo varijable koje su nužne za build.rs.
-# Za CI koristimo "dummy" vrijednosti da kompilacija prođe.
-# Ako želiš vrtjeti prave integracijske testove, koristi ${{ secrets.GEMINI_KEY }}
 env:
   CARGO_TERM_COLOR: always
   VALTER_PROVIDER: "gemini"
-  VALTER_GEMINI_API_KEY: "ci-dummy-key-for-build-process"
-  VALTER_MODEL: "gemini-dummy-model"
+  VALTER_GEMINI_API_KEY: "ci-dummy-key"
+  VALTER_MODEL: "gemini-dummy"
   VALTER_RPM: "30"
+  # UPGRADE 1: Konfiguracija za Mold (zadržavamo ovo jer je brzo i sigurno)
+  RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
+  # UKLONJENO: Sccache (uzrokuje nestabilnost na GitHubu)
 
 jobs:
   # ------------------------------------------------------------------
-  # JOB 1: BRZA PROVJERA KVALITETE (Traje < 30s)
-  # Ako ovo ne prođe, ostali jobovi se ni ne pokreću.
+  # JOB 1: BRZA PROVJERA KVALITETE
   # ------------------------------------------------------------------
   check-quality:
     name: 🔍 Code Quality Check
@@ -36,7 +37,7 @@ jobs:
         run: cargo fmt --all -- --check
 
   # ------------------------------------------------------------------
-  # JOB 2: FRONTEND (Vrti se paralelno s Backendom)
+  # JOB 2: FRONTEND
   # ------------------------------------------------------------------
   frontend:
     name: 🎨 Frontend Build & Lint
@@ -70,7 +71,7 @@ jobs:
         run: pnpm build
 
   # ------------------------------------------------------------------
-  # JOB 3: BACKEND CORE (Najzahtjevniji dio)
+  # JOB 3: BACKEND CORE
   # ------------------------------------------------------------------
   backend:
     name: ⚙️ Core Build, Lint & Test
@@ -79,19 +80,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Cache za Rust (ključan za brzinu jer se vrti u novom containeru)
-      - name: Cache Cargo dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      # UPGRADE 1: Instaliraj Mold Linker (Brzo linkanje, radi lokalno)
+      - name: Set up Mold
+        uses: rui314/setup-mold@v1
 
-      # Sistemske ovisnosti (Ubuntu 24.04 fix uključen)
+      # Sistemske ovisnosti (Ubuntu 24.04 fix)
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -109,10 +102,22 @@ jobs:
         with:
           components: clippy
 
-      # Build.rs će ovdje čitati ENV varijable definirane na vrhu fajla
+      # Standardni Cargo cache (pouzdan)
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
       - name: Run Clippy (Strict)
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
       - name: Run Tests
-        # Koristimo --no-fail-fast da vidimo sve greške odjednom
         run: cargo test --workspace --all-features --no-fail-fast
