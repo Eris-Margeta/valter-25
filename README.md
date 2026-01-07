@@ -112,9 +112,25 @@ VALTER-ERP/
 Cargo commands:
 cargo check
 
-cargo install cargo-edit -> cargo upgrade
+Other commands:
+(
+INSTALL:
+cargo install cargo-edit
+
+USE:
+cargo upgrade
+)
+
+(
+INSTALL:
+rustup toolchain install nightly 
+cargo install cargo-udeps --locked
+
+USE:
+cargo +nightly udeps
+)
 
 
-rustup toolchain install nightly -> required to use cargo-udeps
+
 
 
