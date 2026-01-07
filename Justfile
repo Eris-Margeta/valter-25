@@ -182,3 +182,29 @@ test-rust-verbose:
 test-config:
     @echo "🧪 Testiram logiku varijabli okruženja..."
     @./scripts/test-env-config.sh
+
+
+# =========================================================================
+# RUST COMPILE PERFORMANCE & MAINTENANCE
+# =========================================================================
+
+# Provjeri što se može obrisati (zahtijeva nightly toolchain)
+audit-deps:
+    @echo "🧹 Tražim nekorištene dependencije..."
+    @cargo +nightly udeps
+
+# Provjeri sigurnosne ranjivosti
+audit-sec:
+    @echo "🛡️  Skeniram sigurnosne propuste..."
+    @cargo audit
+
+# Analiziraj što zauzima najviše mjesta u binarnoj datoteci
+audit-bloat:
+    @echo "🐘 Analiziram veličinu binarne datoteke..."
+    @cargo bloat --release --crates -n 10
+
+# Ažuriraj sve biblioteke na najnovije (safe) verzije
+update-deps:
+    @echo "⬆️  Ažuriram Rust dependencije..."
+    @cargo update
+    @echo "✅ Gotovo. Pokreni 'just test-ci' za provjeru."
