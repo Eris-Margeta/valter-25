@@ -105,3 +105,10 @@ update:
     fi
     
     @echo "✅ Updated. Restart daemon with 'valter stop' then 'valter start'."
+
+
+# =========================================================================
+# AUTOMATIZIRANO TESTIRANJE KONFIGURACIJE
+# =========================================================================
+test-config:
+    @./scripts/test-env-config.sh

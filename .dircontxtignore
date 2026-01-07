@@ -1,0 +1,15 @@
+pnpm-lock.yaml
+node_modules/
+Cargo.lock
+package-lock.json
+.astro/
+.vscode/
+target/
+*.bin
+*.pid
+dist/
+.git/
+*.svg
+*.png
+acl-manifests.json
+macOS-schema.json

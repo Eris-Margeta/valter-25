@@ -28,7 +28,9 @@ export async function graphqlRequest(query: string, variables: any = {}) {
       console.warn("[VALTER LINK] GraphQL Error:", json.errors);
       throw new Error(json.errors[0].message);
     }
-    return json.data;
+    // PROMJENA: Vraćamo cijeli JSON objekt, a ne samo `data`
+    // Ovo je važno jer ponekad želimo pristupiti i `errors` polju
+    return json;
   } catch (e) {
     console.error("[VALTER LINK] Network/Parse Error:", e);
     throw e;
@@ -36,6 +38,12 @@ export async function graphqlRequest(query: string, variables: any = {}) {
 }
 
 export const QUERIES = {
+  // NOVI UPIT
+  GET_ENV_CONFIG_STATUS: `
+    query {
+      envConfigStatus
+    }
+  `,
   GET_CONFIG: `
     query { 
       config
@@ -64,7 +72,6 @@ export const QUERIES = {
 };
 
 export const MUTATIONS = {
-  // NEW: Rescan mutation
   RESCAN_ISLANDS: `
     mutation {
       rescanIslands

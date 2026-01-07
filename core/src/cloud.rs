@@ -224,7 +224,7 @@ impl SqliteManager {
         {
             let mut stmt = conn.prepare(query_pending)?;
             let mut rows = stmt.query(params![table, value])?;
-            if let Some(row) = rows.next()? {
+            if let Some(_row) = rows.next()? {
                 return Ok(EntityStatus::Pending(()));
             }
         }
