@@ -35,23 +35,23 @@ serde_yaml = "0.9"
 notify = "6.1"
 rusqlite = { version = "0.30", features = ["bundled"] }
 axum = "0.8"
-async-graphql = "7.0"
-async-graphql-axum = "7.0"
+async-graphql = "7.1"
+async-graphql-axum = "7.1"
 tokio-stream = "0.1"
 ignore = "0.4"
-uuid = { version = "1.0", features = ["v4", "fast-rng"] }
-regex = "1.0"
+uuid = { version = "1.19", features = ["v4", "fast-rng"] }
+regex = "1.12"
 tower-http = { version = "0.5", features = ["cors", "fs"] }
-walkdir = "2.4"
+walkdir = "2.5"
 reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
 dotenv = "0.15"                                                   # Napomena: Imaš i dotenv i dotenvy, kasnije ćemo to počistiti s udeps
 glob = "0.3"
 strsim = "0.10"
-clap = { version = "4.4", features = ["derive"] }
+clap = { version = "4.5", features = ["derive"] }
 nix = { version = "0.27", features = ["signal"] }
-rust-embed = "8.0"
+rust-embed = "8.9"
 mime_guess = "2.0"
 
 [dev-dependencies]
-tempfile = "3.10.1"
+tempfile = "3.24.0"
 mockall = "0.12.1"

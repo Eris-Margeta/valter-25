@@ -106,4 +106,15 @@ VALTER-ERP/
 ├── website/                # Documentation Site
 ├── dev-projects-folder/    # Demo Data
 ├── valter.dev.config       # Dev Configuration
-└── Justfile                # Build Scripts
+└── Justfile                # Build Scriptsa
+
+
+Cargo commands:
+cargo check
+
+cargo install cargo-edit -> cargo upgrade
+
+
+rustup toolchain install nightly -> required to use cargo-udeps
+
+
