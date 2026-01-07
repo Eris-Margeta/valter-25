@@ -1,4 +1,23 @@
+# Cargo.toml
+
 [workspace]
 resolver = "2"
-
 members = ["core", "app/src-tauri"]
+
+# Centralna konfiguracija za linting u cijelom radnom prostoru
+[workspace.lints.clippy]
+# ISPRAVAK: Dajemo grupi niži prioritet kako bismo mogli nadjačati pojedina pravila
+pedantic = { level = "allow", priority = -1 }
+
+# Tretiraj ove česte, ali ponekad "bučne" lintove kao upozorenja.
+# U CI-ju će i dalje biti tretirani kao greške.
+module_name_repetitions = "warn"
+too_many_lines = "warn"
+missing_errors_doc = "warn"
+missing_panics_doc = "warn"
+
+# Tretiraj ove ozbiljne probleme uvijek kao greške (deny).
+# Ova pravila sada imaju viši prioritet (0) i ispravno će se primijeniti.
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"

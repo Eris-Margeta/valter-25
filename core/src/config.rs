@@ -213,40 +213,20 @@ pub mod env {
                 // SVE su pronađene. Koristi runtime vrijednosti.
                 Self {
                     provider: Box::leak(
-                        runtime_values
-                            .remove("VALTER_PROVIDER")
-                            .unwrap()
-                            .into_boxed_str(),
+                        runtime_values.remove("VALTER_PROVIDER").unwrap().into_boxed_str(),
                     ),
                     gemini_api_key: Box::leak(
-                        runtime_values
-                            .remove("VALTER_GEMINI_API_KEY")
-                            .unwrap()
-                            .into_boxed_str(),
+                        runtime_values.remove("VALTER_GEMINI_API_KEY").unwrap().into_boxed_str(),
                     ),
                     model: Box::leak(
-                        runtime_values
-                            .remove("VALTER_MODEL")
-                            .unwrap()
-                            .into_boxed_str(),
+                        runtime_values.remove("VALTER_MODEL").unwrap().into_boxed_str(),
                     ),
-                    rpm: Box::leak(
-                        runtime_values
-                            .remove("VALTER_RPM")
-                            .unwrap()
-                            .into_boxed_str(),
-                    ),
+                    rpm: Box::leak(runtime_values.remove("VALTER_RPM").unwrap().into_boxed_str()),
                     search_api_key: Box::leak(
-                        runtime_values
-                            .remove("VALTER_SEARCH_API_KEY")
-                            .unwrap()
-                            .into_boxed_str(),
+                        runtime_values.remove("VALTER_SEARCH_API_KEY").unwrap().into_boxed_str(),
                     ),
                     search_cx: Box::leak(
-                        runtime_values
-                            .remove("VALTER_SEARCH_CX")
-                            .unwrap()
-                            .into_boxed_str(),
+                        runtime_values.remove("VALTER_SEARCH_CX").unwrap().into_boxed_str(),
                     ),
                     status: ConfigStatus::Runtime,
                 }

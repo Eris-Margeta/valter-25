@@ -8,7 +8,6 @@ use std::path::{Path, PathBuf};
 use std::process;
 use std::thread;
 use std::time::Duration;
-use tracing_subscriber;
 
 #[derive(Parser)]
 #[command(name = "valter")]
@@ -53,7 +52,6 @@ async fn main() -> Result<()> {
         fs::create_dir_all(&default_prod_home)?;
         let log_file = fs::OpenOptions::new()
             .create(true)
-            .write(true)
             .append(true)
             .open(default_prod_home.join("valter.log"))?;
         let exe = env::current_exe()?;
@@ -117,4 +115,3 @@ fn stop_daemon(pid_path: &Path) -> Result<()> {
     let _ = fs::remove_file(pid_path);
     Ok(())
 }
-

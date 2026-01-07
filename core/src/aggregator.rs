@@ -1,10 +1,12 @@
+// core/src/aggregator.rs
+
 use crate::config::{AggregationLogic, AggregationRule};
 use anyhow::Result;
 use glob::glob;
 use serde_yaml::Value;
 use std::fs;
 use std::path::Path;
-use tracing::{info, warn};
+use tracing::info;
 
 pub struct Aggregator;
 
@@ -27,19 +29,13 @@ impl Aggregator {
                 search_pattern_str, rule.name
             );
 
-            if let Ok(paths) = glob(&search_pattern_str) {
-                for entry in paths {
-                    if let Ok(path) = entry {
-                        if path.is_file() {
-                            if let Some(val) = Self::extract_value(&path, &rule.target_field) {
-                                total += val;
-                                count += 1.0;
-                            }
-                        }
+            for path in glob(&search_pattern_str).unwrap_or_else(|_| glob("").unwrap()).flatten() {
+                if path.is_file() {
+                    if let Some(val) = Self::extract_value(&path, &rule.target_field) {
+                        total += val;
+                        count += 1.0;
                     }
                 }
-            } else {
-                warn!("Invalid glob pattern: {}", search_pattern_str);
             }
 
             let final_value = match rule.logic {
@@ -67,11 +63,42 @@ impl Aggregator {
         yaml.get(field).and_then(|v| {
             if let Some(f) = v.as_f64() {
                 Some(f)
-            } else if let Some(i) = v.as_i64() {
-                Some(i as f64)
             } else {
-                None
+                v.as_i64().map(|i| i as f64)
             }
         })
+    }
+}
+
+// ============== UNIT TESTS ==============
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_extract_value_from_yaml() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test.yaml");
+
+        // Slučaj 1: Vrijednost je float
+        fs::write(&file_path, "amount: 123.45").unwrap();
+        assert_eq!(
+            Aggregator::extract_value(&file_path, "amount"),
+            Some(123.45)
+        );
+
+        // Slučaj 2: Vrijednost je integer
+        fs::write(&file_path, "amount: 500").unwrap();
+        assert_eq!(Aggregator::extract_value(&file_path, "amount"), Some(500.0));
+
+        // Slučaj 3: Polje ne postoji
+        fs::write(&file_path, "total: 999").unwrap();
+        assert_eq!(Aggregator::extract_value(&file_path, "amount"), None);
+
+        // Slučaj 4: Vrijednost nije broj
+        fs::write(&file_path, "amount: 'hello'").unwrap();
+        assert_eq!(Aggregator::extract_value(&file_path, "amount"), None);
     }
 }
