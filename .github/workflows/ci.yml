@@ -20,17 +20,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      # Korak 1: Instaliramo službeno preporučene sistemske ovisnosti za Tauri na Ubuntu
+      # Korak 1: Instaliramo službeno preporučene sistemske ovisnosti za Tauri na Ubuntu 24.04
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libwebkit2gtk-4.0-dev \
+            libwebkit2gtk-4.1-dev \
             build-essential \
             pkg-config \
             libssl-dev \
             libgtk-3-dev \
-            libappindicator3-dev \
+            libayatana-appindicator3-dev \
             librsvg2-dev
       
       # Korak 2: Postavi Node.js i pnpm
