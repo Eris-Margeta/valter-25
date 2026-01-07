@@ -13,44 +13,33 @@ env:
 
 jobs:
   lint-and-test-rust:
-    name: Lint & Test Rust (on Debian Trixie)
-    runs-on: ubuntu-latest
-
-    container:
-      image: debian:trixie-slim
+    name: Lint & Test Rust (with Tauri Action)
+    runs-on: ubuntu-latest # Vraćamo se na standardni runner
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      - name: Install System Dependencies (for Tauri on Debian)
-        run: |
-          apt-get update -y
-          apt-get install -y --no-install-recommends \
-            libwebkitgtk-6.0-dev \
-            build-essential \
-            pkg-config \
-            libssl-dev \
-            libgtk-3-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            curl \
-            ca-certificates \
-            git
-      
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
+      # === KLJUČNA PROMJENA: Koristimo službenu Tauri akciju ===
+      # Ova akcija će instalirati Rust, Node.js i SVE potrebne sistemske
+      # ovisnosti (poput GTK, WebKitGTK, itd.) za nas.
+      - name: Set up Tauri build environment
+        uses: tauri-apps/tauri-action@v0
         with:
-          components: rustfmt, clippy
+          # Opcionalno, ali dobra praksa: specificiramo Node.js verziju
+          nodeVersion: '24'
 
+      # Caching je i dalje koristan za ubrzavanje preuzimanja Rust crateova
       - name: Cache Cargo dependencies
         uses: actions/cache@v4
         with:
           path: |
-            /usr/local/cargo/registry
-            /usr/local/cargo/git
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-debian-trixie-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Check Formatting
         run: cargo fmt --all -- --check
