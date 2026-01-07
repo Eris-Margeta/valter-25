@@ -113,7 +113,16 @@ update:
 test-config:
     @./scripts/test-env-config.sh
 
+# Testira frontend aplikaciju (lint & build) i daje jasan status
 test-app:
-    @echo "🧪 Pokrećem testiranje aplikacije (lint & build)... Log se sprema u app-test.log"
-    @# Skripta se pokreće, a sav izlaz (stdout i stderr) se preusmjerava u datoteku.
-    @./scripts/test-app.sh > app-test.log 2>&1
+    @echo "🧪 Pokrećem testiranje aplikacije (lint & build)... Detaljan log se sprema u app-test.log"
+    @# Pokrećemo skriptu i preusmjeravamo sav izlaz u log datoteku.
+    @# Nakon toga, provjeravamo izlazni kod skripte.
+    @# Ako je bio 0 (uspjeh), ispisujemo poruku o uspjehu.
+    @# Ako nije bio 0 (neuspjeh), ispisujemo poruku o grešci.
+    @if ./scripts/test-app.sh > app-test.log 2>&1; then \
+        echo "\n✅ \033[1;32mTESTIRANJE USPJEŠNO ZAVRŠENO!\033[0m"; \
+    else \
+        echo "\n❌ \033[1;31mTESTIRANJE NIJE USPJELO.\033[0m Provjerite 'app-test.log' za detalje."; \
+        exit 1; \
+    fi.sh > app-test.log 2>&1

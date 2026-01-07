@@ -2,9 +2,12 @@ import { useState, useEffect } from "react";
 import type { CloudDefinition, IslandDefinition } from "../types";
 import { Save, AlertCircle, Check } from "lucide-react";
 
+// ISPRAVAK: Zamijenili smo 'any' sa 'unknown' za bolju tipsku sigurnost
+type EntityData = Record<string, unknown>;
+
 interface EntityFormProps {
   definition: CloudDefinition | IslandDefinition;
-  data: Record<string, any>;
+  data: EntityData;
   onSave: (key: string, value: string) => Promise<boolean>;
   readOnly?: boolean;
 }
@@ -17,13 +20,13 @@ export function EntityForm({ definition, data, onSave, readOnly = false }: Entit
     setFormData(data);
   }, [data]);
 
-  const handleChange = async (key: string, value: string) => {
+  const handleChange = (key: string, value: string) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
   const handleBlur = async (key: string, value: string) => {
     if (readOnly) return;
-    if (value === data[key]) return; // No change
+    if (value === data[key]) return;
 
     setStatus((prev) => ({ ...prev, [key]: "saving" }));
     const success = await onSave(key, value);
@@ -36,7 +39,7 @@ export function EntityForm({ definition, data, onSave, readOnly = false }: Entit
     }
   };
 
-  const renderField = (key: string, value: any) => {
+  const renderField = (key: string, value: unknown) => {
     const isEditing = status[key] === "saving";
     const isSuccess = status[key] === "success";
     const isError = status[key] === "error";
@@ -52,7 +55,7 @@ export function EntityForm({ definition, data, onSave, readOnly = false }: Entit
             className={`w-full bg-slate-900 border ${
               isError ? "border-red-500" : isSuccess ? "border-green-500" : "border-slate-700"
             } rounded px-3 py-2 text-white focus:outline-none focus:border-indigo-500 transition-colors`}
-            value={value || ""}
+            value={String(value || "")}
             onChange={(e) => handleChange(key, e.target.value)}
             onBlur={(e) => handleBlur(key, e.target.value)}
             disabled={readOnly}
@@ -74,14 +77,11 @@ export function EntityForm({ definition, data, onSave, readOnly = false }: Entit
       </h2>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Render explicitly defined fields for Clouds */}
         {'fields' in definition && definition.fields.map((f) => 
            renderField(f.key, formData[f.key])
         )}
-
-        {/* Render all data keys for Islands (since they lack explicit field config) */}
         {!('fields' in definition) && Object.keys(formData).map((key) => {
-             if (typeof formData[key] === 'object') return null; // Skip nested objects for now
+             if (typeof formData[key] === 'object' && formData[key] !== null) return null;
              return renderField(key, formData[key]);
         })}
       </div>

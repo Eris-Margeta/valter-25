@@ -1,10 +1,11 @@
-
 import { ChevronRight } from "lucide-react";
 
+type DynamicData = Record<string, unknown>;
+
 interface DynamicTableProps {
-  data: any[];
+  data: DynamicData[];
   title?: string;
-  onRowClick?: (row: any) => void;
+  onRowClick?: (row: DynamicData) => void;
 }
 
 export function DynamicTable({ data, title, onRowClick }: DynamicTableProps) {
@@ -16,7 +17,6 @@ export function DynamicTable({ data, title, onRowClick }: DynamicTableProps) {
     );
   }
 
-  // Infer columns from the first row, excluding complex objects/arrays
   const columns = Object.keys(data[0]).filter((key) => {
     const val = data[0][key];
     return typeof val !== "object" || val === null;

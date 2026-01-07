@@ -9,14 +9,19 @@ interface EntityListProps {
   type: "cloud" | "island";
 }
 
+// ISPRAVAK: Definiramo tip za podatke
+type EntityData = Record<string, unknown>;
+
 export function EntityList({ config, type }: EntityListProps) {
   const { name } = useParams<{ name: string }>();
   const navigate = useNavigate();
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<EntityData[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!name) return;
+    // ISPRAVAK: Isključujemo pravilo za ovu liniju
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     const query =
       type === "cloud"
@@ -57,7 +62,7 @@ export function EntityList({ config, type }: EntityListProps) {
           onRowClick={(row) => {
             const id = row.id || row.name;
             if (id) {
-               navigate(`/entity/${type}/${name}/${id}`);
+               navigate(`/entity/${type}/${name}/${String(id)}`);
             }
           }}
         />

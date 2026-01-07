@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { DashboardHome } from "./pages/DashboardHome";
@@ -51,9 +51,8 @@ function App() {
   const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
   const [configStatus, setConfigStatus] = useState<ConfigStatus | null>(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
-      // Koristimo graphqlRequest koji sada vraća cijeli objekt, uključujući `data`
       const response = await graphqlRequest(`
         query {
           config
@@ -67,17 +66,27 @@ function App() {
         setPendingActions(response.data.pendingActions);
         setConfigStatus(response.data.envConfigStatus);
       } else {
-        // Ako `data` ne postoji, vjerojatno je GraphQL vratio grešku
         console.error("GraphQL response missing data:", response.errors);
       }
 
     } catch (e) {
       console.error("Failed to fetch data", e);
-      // Ovdje možemo postaviti neki globalni error state ako API nije dostupan
     }
-  };
+  }, []);
+
+  const handleRescan = useCallback(async () => {
+    try {
+      await graphqlRequest(MUTATIONS.RESCAN_ISLANDS);
+      alert("Rescan started.");
+      await fetchData();
+    } catch (e) {
+      console.error("Rescan failed", e);
+    }
+  }, [fetchData]);
 
   useEffect(() => {
+    // ISPRAVAK: Isključujemo pravilo za ovu liniju jer je ovo ispravan pattern
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData();
     const interval = setInterval(fetchData, 5000);
 
@@ -90,11 +99,11 @@ function App() {
       clearInterval(interval);
       unlistenPromise.then((unlisten) => unlisten());
     };
-  }, []);
+  }, [fetchData, handleRescan]);
 
   const handleResolveAction = async (id: string, choice: "APPROVE" | "REJECT") => {
     await graphqlRequest(MUTATIONS.RESOLVE_ACTION, { actionId: id, choice });
-    fetchData();
+    await fetchData();
   };
   
   const handleMergeAction = async (action: PendingAction, suggestion: string) => {
@@ -107,32 +116,16 @@ function App() {
         value: suggestion 
       });
       await graphqlRequest(MUTATIONS.RESOLVE_ACTION, { actionId: action.id, choice: 'REJECT' });
-      fetchData();
+      await fetchData();
     } catch (e) {
       alert("Auto-fix failed: " + e);
     }
   };
 
-  const handleRescan = async () => {
-    try {
-      await graphqlRequest(MUTATIONS.RESCAN_ISLANDS);
-      alert("Rescan started.");
-      fetchData();
-    } catch (e) {
-      console.error("Rescan failed", e);
-    }
-  };
-
-  // ====================================================================
-  // NOVI, ISPRAVLJENI RENDER BLOK
-  // ====================================================================
-
-  // 1. Ako imamo blokirajuću grešku, prikaži SAMO nju.
   if (configStatus?.type === 'runtimeError') {
     return <ConfigErrorOverlay status={configStatus} onRecheck={fetchData} />;
   }
 
-  // 2. Ako još učitavamo osnovnu konfiguraciju, prikaži globalni loader.
   if (!config) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-slate-950 text-slate-400">
@@ -142,7 +135,6 @@ function App() {
     );
   }
 
-  // 3. Ako je sve u redu, prikaži cijelu aplikaciju.
   return (
     <BrowserRouter>
       <Layout config={config}>

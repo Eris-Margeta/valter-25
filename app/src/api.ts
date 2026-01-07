@@ -9,7 +9,8 @@ const GRAPHQL_URL = `${BASE_URL}/graphql`;
 console.log(`[VALTER LINK] Mode: ${isDev ? 'DEV' : 'PROD'}`);
 console.log(`[VALTER LINK] Connecting to: ${GRAPHQL_URL}`);
 
-export async function graphqlRequest(query: string, variables: any = {}) {
+// ISPRAVAK: Zamijenili smo 'any' sa 'Record<string, unknown>'
+export async function graphqlRequest(query: string, variables: Record<string, unknown> = {}) {
   try {
     const res = await fetch(GRAPHQL_URL, {
       method: 'POST',
@@ -28,8 +29,6 @@ export async function graphqlRequest(query: string, variables: any = {}) {
       console.warn("[VALTER LINK] GraphQL Error:", json.errors);
       throw new Error(json.errors[0].message);
     }
-    // PROMJENA: Vraćamo cijeli JSON objekt, a ne samo `data`
-    // Ovo je važno jer ponekad želimo pristupiti i `errors` polju
     return json;
   } catch (e) {
     console.error("[VALTER LINK] Network/Parse Error:", e);
@@ -38,7 +37,6 @@ export async function graphqlRequest(query: string, variables: any = {}) {
 }
 
 export const QUERIES = {
-  // NOVI UPIT
   GET_ENV_CONFIG_STATUS: `
     query {
       envConfigStatus
