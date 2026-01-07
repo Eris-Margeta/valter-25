@@ -208,3 +208,7 @@ update-deps:
     @echo "⬆️  Ažuriram Rust dependencije..."
     @cargo update
     @echo "✅ Gotovo. Pokreni 'just test-ci' za provjeru."
+
+upgrade-deps:
+    @echo "⬆️  Ažuriram Rust dependencije..."
+    @cargo upgrade
