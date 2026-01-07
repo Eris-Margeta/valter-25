@@ -130,6 +130,13 @@ format-rust:
 test-ci: check-rust lint-rust test-rust test-app
     @echo "\n✅ \033[1;32mSVE CI PROVJERE SU USPJEŠNO PROŠLE!\033[0m"
 
+test-ci-simulation:
+    @echo "🤖 Simuliram CI Pipeline..."
+    @just check-rust
+    @just test-app
+    @VALTER_GEMINI_API_KEY="ci-dummy" VALTER_PROVIDER="gemini" just lint-rust
+    @VALTER_GEMINI_API_KEY="ci-dummy" VALTER_PROVIDER="gemini" just test-rust
+
 # --- Granularne Provjere (pozivaju se iz `test-ci`) ---
 
 # Provjeri formatiranje Rust koda (ne mijenja fileove)
