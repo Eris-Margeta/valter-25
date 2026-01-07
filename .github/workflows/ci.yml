@@ -14,9 +14,8 @@ env:
 jobs:
   lint-and-test-rust:
     name: Lint & Test Rust (on Debian Trixie)
-    runs-on: ubuntu-latest # Runner je i dalje Ubuntu, ali koraci se izvršavaju u kontejneru
+    runs-on: ubuntu-latest
 
-    # Svi koraci ovog posla izvršavaju se unutar Debian Trixie (budući Debian 13) kontejnera.
     container:
       image: debian:trixie-slim
 
@@ -24,15 +23,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      # Koraci se sada izvršavaju unutar Debian kontejnera
       - name: Install System Dependencies (for Tauri on Debian)
         run: |
-          # Ažuriramo apt i instaliramo sve što nam treba.
-          # Uklonili smo 'sudo' jer smo u kontejneru root korisnik.
-          # '--no-install-recommends' smanjuje veličinu instalacije.
           apt-get update -y
           apt-get install -y --no-install-recommends \
-            libwebkit2gtk-4.0-dev \
+            # === ISPRAVAK: Ažurirano ime WebKitGTK paketa za Debian Trixie ===
+            libwebkitgtk-6.0-dev \
             build-essential \
             pkg-config \
             libssl-dev \
@@ -51,7 +47,6 @@ jobs:
       - name: Cache Cargo dependencies
         uses: actions/cache@v4
         with:
-          # Ažurirane putanje za cache unutar standardnog Docker/kontejner okruženja
           path: |
             /usr/local/cargo/registry
             /usr/local/cargo/git
@@ -77,7 +72,7 @@ jobs:
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 10 # Usklađeno s vašim engineom
+          version: 10
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
