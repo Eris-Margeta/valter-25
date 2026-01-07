@@ -28,6 +28,7 @@ clean:
     rm -rf app/dist app/.vite app/node_modules
     rm -f valter.db valter.log valter.pid valter.db-shm valter.db-wal
     rm -f core/src/fs_writer.rs.bk
+    cargo clean -p valter
 
 # --- BUILD & RELEASE ---
 
@@ -121,15 +122,44 @@ format-rust:
 
 
 # =========================================================================
-# TESTIRANJE I KVALITETA KODA
+# LOKALNA VALIDACIJA I CI PROVJERE
 # =========================================================================
 
-# --- Rust Testovi ---
+# GLAVNA NAREDBA: Pokreni SVE provjere, identično kao na CI serveru.
+# Ovo je naredba koju treba pokrenuti prije pushanja koda.
+test-ci: check-rust lint-rust test-rust test-app
+    @echo "\n✅ \033[1;32mSVE CI PROVJERE SU USPJEŠNO PROŠLE!\033[0m"
+
+# --- Granularne Provjere (pozivaju se iz `test-ci`) ---
+
+# Provjeri formatiranje Rust koda (ne mijenja fileove)
+check-rust:
+    @echo "🔍 Provjeravam formatiranje Rust koda (CI mod)..."
+    @cargo fmt --all -- --check
+
+# Pokreni strogi linter za Rust, tretira upozorenja kao greške
+lint-rust:
+    @echo "Lintam Rust kod (CI mod, stroga provjera)..."
+    @cargo clippy --workspace --all-targets --all-features -- -D warnings
 
 # Pokreni SVE testove (unit & integration) u cijelom Rust workspaceu
 test-rust:
     @echo "🔬 Pokrećem sve Rust testove (unit & integration)..."
-    @cargo test --workspace
+    @cargo test --workspace --all-features
+
+# Testira frontend aplikaciju (lint & build)
+test-app:
+    @echo "Lintam i buildam frontend aplikaciju (CI mod)..."
+    @if ./scripts/test-app.sh > app-test.log 2>&1; then \
+        echo "✅ Frontend provjere su uspješno prošle."; \
+    else \
+        echo "\n❌ \033[1;31mPROVJERE ZA FRONTEND NISU USPJELE.\033[0m Provjerite 'app-test.log' za detalje."; \
+        exit 1; \
+    fi
+
+# =========================================================================
+# TESTIRANJE ZA DEBUGIRANJE (Stare naredbe, i dalje korisne)
+# =========================================================================
 
 # Pokreni testove samo za 'core' biblioteku
 test-rust-core:
@@ -141,21 +171,7 @@ test-rust-verbose:
     @echo "🔬 Pokrećem sve Rust testove s detaljnim ispisom..."
     @cargo test --workspace -- --nocapture
 
-
-# --- Skripte za Testiranje ---
-
 # Testira logiku konfiguracije s varijablama okruženja
 test-config:
     @echo "🧪 Testiram logiku varijabli okruženja..."
     @./scripts/test-env-config.sh
-
-# Testira frontend aplikaciju (lint & build) i daje jasan status
-test-app:
-    @echo "🧪 Pokrećem testiranje aplikacije (lint & build)... Detaljan log se sprema u app-test.log"
-    @if ./scripts/test-app.sh > app-test.log 2>&1; then \
-        echo "\n✅ \033[1;32mTESTIRANJE USPJEŠNO ZAVRŠENO!\033[0m"; \
-    else \
-        echo "\n❌ \033[1;31mTESTIRANJE NIJE USPJELO.\033[0m Provjerite 'app-test.log' za detalje."; \
-        exit 1; \
-    fi
-

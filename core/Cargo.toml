@@ -3,16 +3,18 @@ name = "valter"
 version = "0.1.0"
 edition = "2021"
 
+build = "build.rs"
+
+
 [lib]
 name = "valter_core"
 path = "src/lib.rs"
+
 
 [[bin]]
 name = "valter"
 path = "src/main.rs"
 
-# Build skripta se definira samo jednom, na nivou paketa.
-build = "build.rs"
 
 [build-dependencies]
 dotenvy = "0.15"
@@ -52,7 +54,6 @@ nix = { version = "0.27", features = ["signal"] }
 rust-embed = "8.0"
 mime_guess = "2.0"
 
-# Ovisnosti koje se koriste SAMO za pokretanje testova (`cargo test`)
 [dev-dependencies]
 tempfile = "3.10.1"
 mockall = "0.12.1"

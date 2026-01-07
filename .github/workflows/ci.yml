@@ -1,6 +1,6 @@
 # .github/workflows/ci.yml
 
-name: Rust CI & Lint
+name: CI & Lint
 
 on:
   push:
@@ -12,8 +12,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  lint-and-test:
-    name: Lint & Test Rust Crates
+  lint-and-test-rust:
+    name: Lint & Test Rust
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,20 +38,19 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Run Clippy Linter
-        # Tretiraj sva upozorenja kao greške (-D warnings)
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
       - name: Run Tests
         run: cargo test --workspace --all-features
 
-  test-frontend-app:
-    name: Test Frontend App
+  lint-and-build-frontend:
+    name: Lint & Build Frontend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 10 # Usklađeno s vašim engineom
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -64,6 +63,13 @@ jobs:
         working-directory: ./app
         run: pnpm install --frozen-lockfile
       
+      # === DODANI KORAK ===
+      - name: Run Linter
+        working-directory: ./app
+        run: pnpm lint
+      
       - name: Build
         working-directory: ./app
-        run: pnpm build
+        run: pnpm build```
+
+

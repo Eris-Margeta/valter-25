@@ -1,3 +1,5 @@
+// core/src/api.rs
+
 use crate::cloud::SqliteManager;
 use crate::config::{
     env::{ConfigStatus, EnvConfig},
@@ -22,11 +24,12 @@ use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 
+// Nema više `cfg` magije. Samo jednostavna definicija.
+// `build.rs` sada osigurava da `../app/dist` uvijek postoji.
 #[derive(RustEmbed)]
 #[folder = "../app/dist"]
 struct Assets;
 
-// PROMJENA: ApiState sada sadrži i env_config
 pub struct ApiState {
     pub cloud: Arc<SqliteManager>,
     pub config: Arc<Config>,
@@ -44,7 +47,7 @@ impl QueryRoot {
         Json(state.config.as_ref().clone())
     }
 
-    /// NOVO: Dohvaća status konfiguracije varijabli okruženja.
+    /// Dohvaća status konfiguracije varijabli okruženja.
     async fn env_config_status(&self, ctx: &Context<'_>) -> Json<ConfigStatus> {
         let state = ctx.data::<ApiState>().expect("ApiState missing");
         Json(state.env_config.status.clone())
@@ -68,7 +71,6 @@ impl QueryRoot {
     async fn ask_oracle(&self, ctx: &Context<'_>, question: String) -> String {
         let state = ctx.data::<ApiState>().expect("ApiState missing");
 
-        // PROMJENA: Čitamo vrijednosti iz centralne EnvConfig strukture
         let api_key = state.env_config.gemini_api_key;
         let model_name = state.env_config.model;
 
@@ -196,14 +198,16 @@ async fn graphiql() -> impl IntoResponse {
     ))
 }
 
+// Handler za statičke datoteke, ispravljen za `rust-embed` v8+
 async fn static_handler(uri: Uri) -> impl IntoResponse {
     let mut path = uri.path().trim_start_matches('/').to_string();
     if path.is_empty() {
         path = "index.html".to_string();
     }
+
     match Assets::get(&path) {
         Some(content) => {
-            let mime = mime_guess::from_path(path).first_or_octet_stream();
+            let mime = mime_guess::from_path(&path).first_or_octet_stream();
             ([(header::CONTENT_TYPE, mime.as_ref())], content.data).into_response()
         }
         None => {
@@ -217,7 +221,6 @@ async fn static_handler(uri: Uri) -> impl IntoResponse {
     }
 }
 
-// PROMJENA: Definicija funkcije sada prihvaća `env_config`
 pub async fn start_server(
     cloud: Arc<SqliteManager>,
     config: Arc<Config>,
@@ -230,7 +233,7 @@ pub async fn start_server(
             cloud,
             config: config.clone(),
             processor,
-            env_config, // <-- PROMJENA: Prosljeđujemo ga u stanje
+            env_config,
         })
         .finish();
 
