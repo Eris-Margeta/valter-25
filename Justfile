@@ -210,5 +210,10 @@ update-deps:
     @echo "✅ Gotovo. Pokreni 'just test-ci' za provjeru."
 
 upgrade-deps:
-    @echo "⬆️  Ažuriram Rust dependencije..."
+    @echo "⬆️  Ažuriram Rust dependencije.."
     @cargo upgrade
+
+upgrade-deps-workspace:
+  @echo "⬆️  Tražim workspace sve upgradeove.."
+  @cargo upgrade --workspace --incompatible --verbose
+
