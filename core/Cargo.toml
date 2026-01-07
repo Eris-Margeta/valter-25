@@ -17,12 +17,20 @@ path = "src/main.rs"
 
 
 [build-dependencies]
-dotenvy = "0.15"
+dotenvy = { workspace = true }
 
 [dependencies]
-tokio = { version = "1.0", features = ["full"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+# Nasljeđujemo iz workspacea
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+dotenvy = { workspace = true }
+chrono = { workspace = true }
+
+# Ostale specifične za core ostaju kako jesu (nismo ih micali u root jer ih app ne koristi)
 serde_yaml = "0.9"
 notify = "6.1"
 rusqlite = { version = "0.30", features = ["bundled"] }
@@ -31,22 +39,12 @@ async-graphql = "7.0"
 async-graphql-axum = "7.0"
 tokio-stream = "0.1"
 ignore = "0.4"
-anyhow = "1.0"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = [
-  "env-filter",
-  "chrono",
-  "time",
-  "local-time",
-] }
 uuid = { version = "1.0", features = ["v4", "fast-rng"] }
 regex = "1.0"
 tower-http = { version = "0.5", features = ["cors", "fs"] }
 walkdir = "2.4"
 reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
-dotenv = "0.15"
-dotenvy = "0.15"
-chrono = "0.4"
+dotenv = "0.15"                                                   # Napomena: Imaš i dotenv i dotenvy, kasnije ćemo to počistiti s udeps
 glob = "0.3"
 strsim = "0.10"
 clap = { version = "4.4", features = ["derive"] }
