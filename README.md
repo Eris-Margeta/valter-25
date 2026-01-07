@@ -130,7 +130,15 @@ USE:
 cargo +nightly udeps
 )
 
+(
+INSTALL:
+cargo install cargo-audit cargo-bloat
 
+USE:
+cargo audit
+cargo bloat --release --crates -n 10
+
+)
 
 
 

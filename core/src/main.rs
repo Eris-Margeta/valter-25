@@ -26,7 +26,7 @@ enum Commands {
 #[tokio::main]
 async fn main() -> Result<()> {
     if env::var("VALTER_TEST_MODE").is_err() {
-        dotenv::dotenv().ok();
+        dotenvy::dotenv().ok();
     }
     let cli = Cli::parse();
 
