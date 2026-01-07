@@ -60,4 +60,4 @@ export type ConfigStatus =
   | { type: 'compileTime' }
   | { type: 'compileTimeIgnored' }
   | { type: 'runtime' }
-  | { type: 'runtimeError'; missingKeys: string[] };meError'; missingKeys: string[] };
+  | { type: 'runtimeError'; missingKeys: string[] };

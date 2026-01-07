@@ -66,11 +66,4 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          # ISPRAVAK: Gledamo oba Cargo.lock fajla za bolji caching
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      
-      - name: Check
-        run: cargo check --workspace
-      
-      - name: Test
-        run: cargo test --workspace
+          # ISPRAVAK: Gledamo oba Cargo.lock fajla za bolji caust --workspace

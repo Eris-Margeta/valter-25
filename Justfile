@@ -112,3 +112,8 @@ update:
 # =========================================================================
 test-config:
     @./scripts/test-env-config.sh
+
+test-app:
+    @echo "🧪 Pokrećem testiranje aplikacije (lint & build)... Log se sprema u app-test.log"
+    @# Skripta se pokreće, a sav izlaz (stdout i stderr) se preusmjerava u datoteku.
+    @./scripts/test-app.sh > app-test.log 2>&1
