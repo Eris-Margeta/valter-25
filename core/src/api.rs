@@ -52,29 +52,17 @@ impl QueryRoot {
 
     async fn cloud_data(&self, ctx: &Context<'_>, name: String) -> Json<Vec<Value>> {
         let state = ctx.data::<ApiState>().expect("ApiState missing");
-        state
-            .cloud
-            .fetch_all_dynamic(&name)
-            .map(Json)
-            .unwrap_or(Json(vec![]))
+        state.cloud.fetch_all_dynamic(&name).map(Json).unwrap_or(Json(vec![]))
     }
 
     async fn island_data(&self, ctx: &Context<'_>, name: String) -> Json<Vec<Value>> {
         let state = ctx.data::<ApiState>().expect("ApiState missing");
-        state
-            .cloud
-            .fetch_all_dynamic(&name)
-            .map(Json)
-            .unwrap_or(Json(vec![]))
+        state.cloud.fetch_all_dynamic(&name).map(Json).unwrap_or(Json(vec![]))
     }
 
     async fn pending_actions(&self, ctx: &Context<'_>) -> Json<Vec<Value>> {
         let state = ctx.data::<ApiState>().expect("ApiState missing");
-        state
-            .cloud
-            .fetch_pending_actions()
-            .map(Json)
-            .unwrap_or(Json(vec![]))
+        state.cloud.fetch_pending_actions().map(Json).unwrap_or(Json(vec![]))
     }
 
     async fn ask_oracle(&self, ctx: &Context<'_>, question: String) -> String {

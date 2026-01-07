@@ -125,10 +125,7 @@ impl EventProcessor {
         let content = fs::read_to_string(path)?;
         let yaml: Value = serde_yaml::from_str(&content)?;
 
-        let project_name = yaml
-            .get("name")
-            .and_then(|v| v.as_str())
-            .unwrap_or("Unknown Project");
+        let project_name = yaml.get("name").and_then(|v| v.as_str()).unwrap_or("Unknown Project");
 
         let project_root = path.parent().unwrap();
         let mut relation_map: HashMap<String, Option<String>> = HashMap::new();
@@ -138,11 +135,8 @@ impl EventProcessor {
             if let Some(val_raw) = yaml.get(&rel.field) {
                 if let Some(val_str) = val_raw.as_str() {
                     // Dinamičko traženje ID polja u target cloudu
-                    let target_cloud_def = self
-                        .config
-                        .clouds
-                        .iter()
-                        .find(|c| c.name == rel.target_cloud);
+                    let target_cloud_def =
+                        self.config.clouds.iter().find(|c| c.name == rel.target_cloud);
                     let key_field = target_cloud_def
                         .and_then(|def| def.fields.first())
                         .map(|f| f.key.as_str())

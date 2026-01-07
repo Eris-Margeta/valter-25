@@ -1,0 +1,14 @@
+# rustfmt.toml
+
+# Koristi ediciju definiranu u Cargo.toml
+edition = "2021"
+
+# Maksimalna širina linije koda
+max_width = 100
+
+# Pomaže pri formatiranju lančanih poziva metoda
+chain_width = 80
+
+# Koristi razmake umjesto tabova
+hard_tabs = false
+tab_spaces = 4

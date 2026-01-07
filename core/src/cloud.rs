@@ -388,11 +388,8 @@ impl SqliteManager {
             Err(_) => return Ok(vec![]),
         };
 
-        let col_names: Vec<String> = stmt
-            .column_names()
-            .into_iter()
-            .map(|s| s.to_string())
-            .collect();
+        let col_names: Vec<String> =
+            stmt.column_names().into_iter().map(|s| s.to_string()).collect();
         let rows = stmt.query_map([], |row| {
             let mut map = Map::new();
             for i in 0..col_names.len() {
@@ -429,11 +426,8 @@ impl SqliteManager {
             Err(_) => return Ok(vec![]),
         };
 
-        let col_names: Vec<String> = stmt
-            .column_names()
-            .into_iter()
-            .map(|s| s.to_string())
-            .collect();
+        let col_names: Vec<String> =
+            stmt.column_names().into_iter().map(|s| s.to_string()).collect();
         let rows = stmt.query_map([], |row| {
             let mut map = Map::new();
             for i in 0..col_names.len() {

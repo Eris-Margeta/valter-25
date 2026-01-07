@@ -1,4 +1,6 @@
-name: CI
+# .github/workflows/ci.yml
+
+name: Rust CI & Lint
 
 on:
   push:
@@ -10,60 +12,58 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-app:
-    name: Build App (Frontend)
+  lint-and-test:
+    name: Lint & Test Rust Crates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Check Formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run Clippy Linter
+        # Tretiraj sva upozorenja kao greške (-D warnings)
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+      - name: Run Tests
+        run: cargo test --workspace --all-features
+
+  test-frontend-app:
+    name: Test Frontend App
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 10 # Usklađeno s vašim engineom
+          version: 10
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 24 # Usklađeno s .nvmrc
+          node-version: 24
           cache: 'pnpm'
-          # ISPRAVAK: Putanja do lock datoteke je sada u 'app' folderu
           cache-dependency-path: 'app/pnpm-lock.yaml'
       
       - name: Install Dependencies
-        # ISPRAVAK: Radimo unutar 'app' foldera
         working-directory: ./app
         run: pnpm install --frozen-lockfile
       
       - name: Build
-        # ISPRAVAK: Build se također pokreće iz 'app' foldera
         working-directory: ./app
         run: pnpm build
-
-      - name: Upload app artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-dist
-          path: app/dist
-
-  test-core:
-    name: Test Core (Rust)
-    runs-on: ubuntu-latest
-    needs: build-app
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Download app artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: app-dist
-          path: app/dist
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-      
-      - name: Cache Cargo
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          # ISPRAVAK: Gledamo oba Cargo.lock fajla za bolji caust --workspace

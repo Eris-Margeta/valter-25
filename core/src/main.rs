@@ -117,4 +117,3 @@ fn stop_daemon(pid_path: &Path) -> Result<()> {
     let _ = fs::remove_file(pid_path);
     Ok(())
 }
-

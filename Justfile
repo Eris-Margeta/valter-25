@@ -108,21 +108,54 @@ update:
 
 
 # =========================================================================
-# AUTOMATIZIRANO TESTIRANJE KONFIGURACIJE
+# FORMATIRANJE KODA
 # =========================================================================
+# TODO: Dodati formatiranje za React (Prettier), TOML, YAML itd.
+
+# Formatiraj sav Rust kod u projektu prema `rustfmt.toml` pravilima
+format-rust:
+    @echo "🖌️  Formatiram Rust kod..."
+    @cargo fmt --all
+
+
+
+
+# =========================================================================
+# TESTIRANJE I KVALITETA KODA
+# =========================================================================
+
+# --- Rust Testovi ---
+
+# Pokreni SVE testove (unit & integration) u cijelom Rust workspaceu
+test-rust:
+    @echo "🔬 Pokrećem sve Rust testove (unit & integration)..."
+    @cargo test --workspace
+
+# Pokreni testove samo za 'core' biblioteku
+test-rust-core:
+    @echo "🔬 Pokrećem testove samo za 'core' crate..."
+    @cargo test -p valter
+
+# Pokreni testove i prikaži ispis (println!) iz njih za lakše debugiranje
+test-rust-verbose:
+    @echo "🔬 Pokrećem sve Rust testove s detaljnim ispisom..."
+    @cargo test --workspace -- --nocapture
+
+
+# --- Skripte za Testiranje ---
+
+# Testira logiku konfiguracije s varijablama okruženja
 test-config:
+    @echo "🧪 Testiram logiku varijabli okruženja..."
     @./scripts/test-env-config.sh
 
 # Testira frontend aplikaciju (lint & build) i daje jasan status
 test-app:
     @echo "🧪 Pokrećem testiranje aplikacije (lint & build)... Detaljan log se sprema u app-test.log"
-    @# Pokrećemo skriptu i preusmjeravamo sav izlaz u log datoteku.
-    @# Nakon toga, provjeravamo izlazni kod skripte.
-    @# Ako je bio 0 (uspjeh), ispisujemo poruku o uspjehu.
-    @# Ako nije bio 0 (neuspjeh), ispisujemo poruku o grešci.
     @if ./scripts/test-app.sh > app-test.log 2>&1; then \
         echo "\n✅ \033[1;32mTESTIRANJE USPJEŠNO ZAVRŠENO!\033[0m"; \
     else \
         echo "\n❌ \033[1;31mTESTIRANJE NIJE USPJELO.\033[0m Provjerite 'app-test.log' za detalje."; \
         exit 1; \
-    fi.sh > app-test.log 2>&1
+    fi
+

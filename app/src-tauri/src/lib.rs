@@ -12,11 +12,18 @@ pub fn run() {
         .setup(|app| {
             // --- MENU SETUP ---
             let handle = app.handle();
-            
+
             // 1. Valter Menu (App Name)
-            let rescan_item = MenuItem::with_id(handle, "rescan", "Rescan System", true, Some("CmdOrCtrl+R"))?;
-            let config_item = MenuItem::with_id(handle, "open_config", "Open Configuration", true, Some("CmdOrCtrl+,"))?;
-            
+            let rescan_item =
+                MenuItem::with_id(handle, "rescan", "Rescan System", true, Some("CmdOrCtrl+R"))?;
+            let config_item = MenuItem::with_id(
+                handle,
+                "open_config",
+                "Open Configuration",
+                true,
+                Some("CmdOrCtrl+,"),
+            )?;
+
             let app_menu = Submenu::with_items(
                 handle,
                 "Valter",
@@ -49,9 +56,7 @@ pub fn run() {
                 handle,
                 "View",
                 true,
-                &[
-                    &PredefinedMenuItem::fullscreen(handle, None)?,
-                ],
+                &[&PredefinedMenuItem::fullscreen(handle, None)?],
             )?;
 
             let window_menu = Submenu::with_items(
@@ -66,16 +71,9 @@ pub fn run() {
             )?;
 
             // BUILD MENU
-            let menu = Menu::with_items(
-                handle,
-                &[
-                    &app_menu,
-                    &edit_menu,
-                    &view_menu,
-                    &window_menu,
-                ],
-            )?;
-            
+            let menu =
+                Menu::with_items(handle, &[&app_menu, &edit_menu, &view_menu, &window_menu])?;
+
             app.set_menu(menu)?;
 
             // MENU EVENTS
@@ -86,28 +84,43 @@ pub fn run() {
                 } else if event.id() == config_item.id() {
                     println!("Menu: Open Config triggered");
                     // Resolve config path again (a bit repetitive, but safe)
-                     let is_dev = cfg!(debug_assertions);
-                     let valter_home = if let Ok(h) = env::var("VALTER_HOME") {
+                    let is_dev = cfg!(debug_assertions);
+                    let valter_home = if let Ok(h) = env::var("VALTER_HOME") {
                         PathBuf::from(h)
                     } else if is_dev {
                         // Heuristic: try to find root
                         let p = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-                        if p.join("valter.dev.config").exists() { p }
-                        else if p.parent().map(|x| x.join("valter.dev.config").exists()).unwrap_or(false) { p.parent().unwrap().to_path_buf() }
-                        else if p.parent().and_then(|x| x.parent()).map(|x| x.join("valter.dev.config").exists()).unwrap_or(false) { p.parent().unwrap().parent().unwrap().to_path_buf() }
-                        else { PathBuf::from("../../") }
+                        if p.join("valter.dev.config").exists() {
+                            p
+                        } else if p
+                            .parent()
+                            .map(|x| x.join("valter.dev.config").exists())
+                            .unwrap_or(false)
+                        {
+                            p.parent().unwrap().to_path_buf()
+                        } else if p
+                            .parent()
+                            .and_then(|x| x.parent())
+                            .map(|x| x.join("valter.dev.config").exists())
+                            .unwrap_or(false)
+                        {
+                            p.parent().unwrap().parent().unwrap().to_path_buf()
+                        } else {
+                            PathBuf::from("../../")
+                        }
                     } else {
-                        env::var("HOME").or_else(|_| env::var("USERPROFILE"))
+                        env::var("HOME")
+                            .or_else(|_| env::var("USERPROFILE"))
                             .map(|h| PathBuf::from(h).join(".valter"))
                             .unwrap_or_else(|_| PathBuf::from(".valter"))
                     };
-                    
+
                     let config_file = if is_dev {
                         valter_home.join("valter.dev.config")
                     } else {
                         valter_home.join("valter.config")
                     };
-                    
+
                     if let Err(e) = open::that(&config_file) {
                         eprintln!("Failed to open config: {}", e);
                     }
@@ -121,30 +134,39 @@ pub fn run() {
             // Spawn Valter Core
             tauri::async_runtime::spawn(async move {
                 let is_dev = cfg!(debug_assertions);
-                
+
                 let valter_home = if let Ok(h) = env::var("VALTER_HOME") {
                     PathBuf::from(h)
                 } else if is_dev {
-                   let path = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-                   if path.join("valter.dev.config").exists() {
-                       path
-                   } else if path.parent().map(|p| p.join("valter.dev.config").exists()).unwrap_or(false) {
-                       path.parent().unwrap().to_path_buf()
-                   } else if path.parent().and_then(|p| p.parent()).map(|p| p.join("valter.dev.config").exists()).unwrap_or(false) {
-                       path.parent().unwrap().parent().unwrap().to_path_buf()
-                   } else {
-                       PathBuf::from("../../") 
-                   }
+                    let path = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+                    if path.join("valter.dev.config").exists() {
+                        path
+                    } else if path
+                        .parent()
+                        .map(|p| p.join("valter.dev.config").exists())
+                        .unwrap_or(false)
+                    {
+                        path.parent().unwrap().to_path_buf()
+                    } else if path
+                        .parent()
+                        .and_then(|p| p.parent())
+                        .map(|p| p.join("valter.dev.config").exists())
+                        .unwrap_or(false)
+                    {
+                        path.parent().unwrap().parent().unwrap().to_path_buf()
+                    } else {
+                        PathBuf::from("../../")
+                    }
                 } else {
                     env::var("HOME")
-                      .or_else(|_| env::var("USERPROFILE"))
-                      .map(|h| PathBuf::from(h).join(".valter"))
-                      .unwrap_or_else(|_| PathBuf::from(".valter"))
+                        .or_else(|_| env::var("USERPROFILE"))
+                        .map(|h| PathBuf::from(h).join(".valter"))
+                        .unwrap_or_else(|_| PathBuf::from(".valter"))
                 };
-                
+
                 let abs_home = std::fs::canonicalize(&valter_home).unwrap_or(valter_home.clone());
                 println!("🚀 Starting Valter Core at {:?}", abs_home);
-                
+
                 if let Err(e) = valter_core::run(abs_home, is_dev).await {
                     eprintln!("Valter Core Error: {}", e);
                 }

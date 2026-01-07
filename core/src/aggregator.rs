@@ -1,3 +1,5 @@
+// core/src/aggregator.rs
+
 use crate::config::{AggregationLogic, AggregationRule};
 use anyhow::Result;
 use glob::glob;
@@ -73,5 +75,38 @@ impl Aggregator {
                 None
             }
         })
+    }
+}
+
+// ============== UNIT TESTS ==============
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_extract_value_from_yaml() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("test.yaml");
+
+        // Slučaj 1: Vrijednost je float
+        fs::write(&file_path, "amount: 123.45").unwrap();
+        assert_eq!(
+            Aggregator::extract_value(&file_path, "amount"),
+            Some(123.45)
+        );
+
+        // Slučaj 2: Vrijednost je integer
+        fs::write(&file_path, "amount: 500").unwrap();
+        assert_eq!(Aggregator::extract_value(&file_path, "amount"), Some(500.0));
+
+        // Slučaj 3: Polje ne postoji
+        fs::write(&file_path, "total: 999").unwrap();
+        assert_eq!(Aggregator::extract_value(&file_path, "amount"), None);
+
+        // Slučaj 4: Vrijednost nije broj
+        fs::write(&file_path, "amount: 'hello'").unwrap();
+        assert_eq!(Aggregator::extract_value(&file_path, "amount"), None);
     }
 }
