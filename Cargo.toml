@@ -23,9 +23,8 @@ expect_used = "deny"
 panic = "deny"
 
 [workspace.dependencies]
-# Zajedničke
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
 tokio = { version = "1.49", features = [
   "macros",
   "rt-multi-thread",
@@ -36,12 +35,12 @@ tokio = { version = "1.49", features = [
   "time",
   "signal",
 ] }
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "chrono"] }
-log = "0.4"
-anyhow = "1.0"
-chrono = "0.4"
-dotenvy = "0.15"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.22", features = ["env-filter", "chrono"] }
+log = "0.4.29"
+anyhow = "1.0.1"
+chrono = "0.4.42"
+dotenvy = "0.15.7"
 
 # Tauri specifične (ali definirane ovdje za red)
 tauri = { version = "2.9.5", features = [] }
