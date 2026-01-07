@@ -1,9 +1,10 @@
-// core/src/api.rs (ISPRAVLJENO)
-
 use crate::cloud::SqliteManager;
-use crate::config::Config;
+use crate::config::{
+    env::{ConfigStatus, EnvConfig},
+    Config,
+};
 use crate::fs_writer::FsWriter;
-use crate::processor::EventProcessor; // Dodano za rescan
+use crate::processor::EventProcessor;
 use async_graphql::{Context, EmptySubscription, Json, Object, Schema};
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse};
 use axum::{
@@ -22,22 +23,31 @@ use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 
 #[derive(RustEmbed)]
-#[folder = "../dashboard/dist"]
+#[folder = "../app/dist"]
 struct Assets;
 
+// PROMJENA: ApiState sada sadrži i env_config
 pub struct ApiState {
     pub cloud: Arc<SqliteManager>,
     pub config: Arc<Config>,
-    pub processor: Arc<EventProcessor>, // DODANO: Treba nam procesor za rescan
+    pub processor: Arc<EventProcessor>,
+    pub env_config: Arc<EnvConfig>,
 }
 
 pub struct QueryRoot;
 
 #[Object]
 impl QueryRoot {
+    /// Dohvaća YAML konfiguraciju (`valter.config`).
     async fn config(&self, ctx: &Context<'_>) -> Json<Config> {
         let state = ctx.data::<ApiState>().expect("ApiState missing");
         Json(state.config.as_ref().clone())
+    }
+
+    /// NOVO: Dohvaća status konfiguracije varijabli okruženja.
+    async fn env_config_status(&self, ctx: &Context<'_>) -> Json<ConfigStatus> {
+        let state = ctx.data::<ApiState>().expect("ApiState missing");
+        Json(state.env_config.status.clone())
     }
 
     async fn cloud_data(&self, ctx: &Context<'_>, name: String) -> Json<Vec<Value>> {
@@ -69,18 +79,28 @@ impl QueryRoot {
 
     async fn ask_oracle(&self, ctx: &Context<'_>, question: String) -> String {
         let state = ctx.data::<ApiState>().expect("ApiState missing");
+
+        // PROMJENA: Čitamo vrijednosti iz centralne EnvConfig strukture
+        let api_key = state.env_config.gemini_api_key;
+        let model_name = state.env_config.model;
+
+        if api_key.is_empty() {
+            return "Error: GEMINI_API_KEY is not configured.".to_string();
+        }
+
+        info!("Using Gemini Model: {}", model_name);
+
+        let url = format!(
+            "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent?key={}",
+            model_name, api_key
+        );
+
         let mut context_str = String::from("System Context:\n");
         for cloud in &state.config.clouds {
             context_str.push_str(&format!("Table: {}\n", cloud.name));
         }
 
-        let api_key = std::env::var("GEMINI_API_KEY").unwrap_or_default();
-        if api_key.is_empty() {
-            return "Error: GEMINI_API_KEY missing.".to_string();
-        }
-
         let client = reqwest::Client::new();
-        let url = format!("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={}", api_key);
         let prompt = format!(
             "Role: Valter Oracle.\nContext: {}\nQuery: {}",
             context_str, question
@@ -107,7 +127,6 @@ pub struct MutationRoot;
 
 #[Object]
 impl MutationRoot {
-    // DODANO: rescanIslands mutacija
     async fn rescan_islands(&self, ctx: &Context<'_>) -> String {
         let state = ctx.data::<ApiState>().expect("ApiState missing");
         info!("Manual Rescan Requested via API");
@@ -210,10 +229,12 @@ async fn static_handler(uri: Uri) -> impl IntoResponse {
     }
 }
 
+// PROMJENA: Definicija funkcije sada prihvaća `env_config`
 pub async fn start_server(
     cloud: Arc<SqliteManager>,
     config: Arc<Config>,
-    processor: Arc<EventProcessor>, // DODANO: Proslijedi procesor
+    processor: Arc<EventProcessor>,
+    env_config: Arc<EnvConfig>,
     mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
 ) -> anyhow::Result<()> {
     let schema = Schema::build(QueryRoot, MutationRoot, EmptySubscription)
@@ -221,7 +242,8 @@ pub async fn start_server(
             cloud,
             config: config.clone(),
             processor,
-        }) // DODANO: Stavi procesor u state
+            env_config, // <-- PROMJENA: Prosljeđujemo ga u stanje
+        })
         .finish();
 
     let cors = CorsLayer::new()

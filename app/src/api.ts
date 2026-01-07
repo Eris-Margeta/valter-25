@@ -9,7 +9,8 @@ const GRAPHQL_URL = `${BASE_URL}/graphql`;
 console.log(`[VALTER LINK] Mode: ${isDev ? 'DEV' : 'PROD'}`);
 console.log(`[VALTER LINK] Connecting to: ${GRAPHQL_URL}`);
 
-export async function graphqlRequest(query: string, variables: any = {}) {
+// ISPRAVAK: Zamijenili smo 'any' sa 'Record<string, unknown>'
+export async function graphqlRequest(query: string, variables: Record<string, unknown> = {}) {
   try {
     const res = await fetch(GRAPHQL_URL, {
       method: 'POST',
@@ -28,7 +29,7 @@ export async function graphqlRequest(query: string, variables: any = {}) {
       console.warn("[VALTER LINK] GraphQL Error:", json.errors);
       throw new Error(json.errors[0].message);
     }
-    return json.data;
+    return json;
   } catch (e) {
     console.error("[VALTER LINK] Network/Parse Error:", e);
     throw e;
@@ -36,6 +37,11 @@ export async function graphqlRequest(query: string, variables: any = {}) {
 }
 
 export const QUERIES = {
+  GET_ENV_CONFIG_STATUS: `
+    query {
+      envConfigStatus
+    }
+  `,
   GET_CONFIG: `
     query { 
       config
@@ -64,7 +70,6 @@ export const QUERIES = {
 };
 
 export const MUTATIONS = {
-  // NEW: Rescan mutation
   RESCAN_ISLANDS: `
     mutation {
       rescanIslands

@@ -26,7 +26,9 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    dotenv::dotenv().ok();
+    if env::var("VALTER_TEST_MODE").is_err() {
+        dotenv::dotenv().ok();
+    }
     let cli = Cli::parse();
 
     let default_prod_home = env::var("HOME")
@@ -115,3 +117,4 @@ fn stop_daemon(pid_path: &Path) -> Result<()> {
     let _ = fs::remove_file(pid_path);
     Ok(())
 }
+

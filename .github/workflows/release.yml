@@ -31,13 +31,13 @@ jobs:
         config:
           - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu, suffix: "" }
           - { os: macos-latest, target: x86_64-apple-darwin, suffix: "" }
-          - { os: macos-latest, target: aarch64-apple-darwin, suffix: "" } # M1/M2 Mac
+          - { os: macos-latest, target: aarch64-apple-darwin, suffix: "" }
           - { os: windows-latest, target: x86_64-pc-windows-msvc, suffix: ".exe" }
 
     steps:
       - uses: actions/checkout@v4
 
-      # ISPRAVAK: Dodajemo build dashboarda prije builda Rust binary-a
+      # ISPRAVAK: Koraci za izgradnju frontenda sada koriste 'app' folder
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
@@ -47,13 +47,13 @@ jobs:
         with:
           node-version: 24
           cache: 'pnpm'
-          cache-dependency-path: 'dashboard/pnpm-lock.yaml'
-      - name: Install Dashboard Dependencies
+          cache-dependency-path: 'app/pnpm-lock.yaml'
+      - name: Install App Dependencies
         run: pnpm install --frozen-lockfile
-        working-directory: ./dashboard
-      - name: Build Dashboard
+        working-directory: ./app
+      - name: Build App
         run: pnpm build
-        working-directory: ./dashboard
+        working-directory: ./app
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
@@ -61,16 +61,16 @@ jobs:
           targets: ${{ matrix.config.target }}
 
       - name: Build Release
-        # Buildamo iz roota da rust-embed nađe ispravnu putanju do dashboard/dist
-        run: cargo build --manifest-path core/Cargo.toml --release --target ${{ matrix.config.target }}
+        # Buildamo cijeli workspace iz roota
+        run: cargo build --workspace --release --target ${{ matrix.config.target }}
 
       - name: Package Asset
         shell: bash
         run: |
-          # Ažuriramo putanju jer buildamo iz roota
+          # Putanja do release binary-a je sada unutar workspace-a
           cd target/${{ matrix.config.target }}/release
           
-          # Rename binary to generic name for packaging
+          # Glavni binary je sada 'valter', a ne 'app'
           cp valter${{ matrix.config.suffix }} ../../../valter-${{ matrix.config.target }}${{ matrix.config.suffix }}
           cd ../../..
       

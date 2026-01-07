@@ -38,7 +38,6 @@ export interface IslandDefinition {
   aggregations: AggregationRule[];
 }
 
-// FIX: Promijenjeno u VELIKA slova da odgovara Rust/YAML strukturi
 export interface AppConfig {
   GLOBAL: GlobalConfig;
   CLOUDS: CloudDefinition[];
@@ -57,3 +56,8 @@ export interface PendingAction {
   created_at: string;
 }
 
+export type ConfigStatus =
+  | { type: 'compileTime' }
+  | { type: 'compileTimeIgnored' }
+  | { type: 'runtime' }
+  | { type: 'runtimeError'; missingKeys: string[] };
