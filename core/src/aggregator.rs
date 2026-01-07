@@ -6,7 +6,7 @@ use glob::glob;
 use serde_yaml::Value;
 use std::fs;
 use std::path::Path;
-use tracing::{info, warn};
+use tracing::info;
 
 pub struct Aggregator;
 
@@ -29,19 +29,13 @@ impl Aggregator {
                 search_pattern_str, rule.name
             );
 
-            if let Ok(paths) = glob(&search_pattern_str) {
-                for entry in paths {
-                    if let Ok(path) = entry {
-                        if path.is_file() {
-                            if let Some(val) = Self::extract_value(&path, &rule.target_field) {
-                                total += val;
-                                count += 1.0;
-                            }
-                        }
+            for path in glob(&search_pattern_str).unwrap_or_else(|_| glob("").unwrap()).flatten() {
+                if path.is_file() {
+                    if let Some(val) = Self::extract_value(&path, &rule.target_field) {
+                        total += val;
+                        count += 1.0;
                     }
                 }
-            } else {
-                warn!("Invalid glob pattern: {}", search_pattern_str);
             }
 
             let final_value = match rule.logic {
@@ -69,10 +63,8 @@ impl Aggregator {
         yaml.get(field).and_then(|v| {
             if let Some(f) = v.as_f64() {
                 Some(f)
-            } else if let Some(i) = v.as_i64() {
-                Some(i as f64)
             } else {
-                None
+                v.as_i64().map(|i| i as f64)
             }
         })
     }

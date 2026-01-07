@@ -216,15 +216,12 @@ impl SqliteManager {
             }
         }
 
-        // 2. Check if already Pending (Ignore status for now, we just check existence)
-        // Zapravo, želimo vratiti pending samo ako je 'Pending'. Ako je 'Rejected', želimo ga ponovno prikazati?
-        // User je tražio "RESCAN" koji resetira stvari.
-        // Ovdje provjeravamo samo 'Pending' status.
+        // 2. Check if already Pending
         let query_pending = "SELECT id FROM pending_actions WHERE target_table = ? AND value = ? AND status = 'Pending'";
         {
             let mut stmt = conn.prepare(query_pending)?;
             let mut rows = stmt.query(params![table, value])?;
-            if let Some(_row) = rows.next()? {
+            if rows.next()?.is_some() {
                 return Ok(EntityStatus::Pending(()));
             }
         }
@@ -232,13 +229,11 @@ impl SqliteManager {
         // 3. Create Suggestions & New Action
         let mut suggestions = Vec::new();
         if let Ok(mut stmt) = conn.prepare(&format!("SELECT {} FROM {}", key_field, table)) {
-            let names_iter = stmt.query_map([], |row| row.get::<_, String>(0))?;
-            for name_res in names_iter {
-                if let Ok(existing_name) = name_res {
-                    let dist = levenshtein(value, &existing_name);
-                    if dist > 0 && dist <= 3 {
-                        suggestions.push(existing_name);
-                    }
+            // ISPRAVAK 3: Korištenje `flatten()`
+            for existing_name in stmt.query_map([], |row| row.get::<_, String>(0))?.flatten() {
+                let dist = levenshtein(value, &existing_name);
+                if dist > 0 && dist <= 3 {
+                    suggestions.push(existing_name);
                 }
             }
         }
@@ -389,23 +384,26 @@ impl SqliteManager {
         };
 
         let col_names: Vec<String> =
-            stmt.column_names().into_iter().map(|s| s.to_string()).collect();
+            stmt.column_names().into_iter().map(std::string::ToString::to_string).collect();
         let rows = stmt.query_map([], |row| {
             let mut map = Map::new();
-            for i in 0..col_names.len() {
+            // ISPRAVAK 1: Korištenje `enumerate()` umjesto `for i in 0..len()`
+            for (i, name) in col_names.iter().enumerate() {
                 let val: SqlValue = row.get(i)?;
-                let json_val = match val {
-                    SqlValue::Text(s) => {
-                        if col_names[i] == "suggestions" {
-                            serde_json::from_str(&s).unwrap_or(JsonValue::String(s))
-                        } else {
-                            JsonValue::String(s)
-                        }
+                let json_val = if name == "suggestions" {
+                    if let SqlValue::Text(s) = val {
+                        serde_json::from_str(&s).unwrap_or(JsonValue::String(s))
+                    } else {
+                        JsonValue::Null
                     }
-                    SqlValue::Null => JsonValue::Null,
-                    _ => JsonValue::String("Unknown".to_string()),
+                } else {
+                    match val {
+                        SqlValue::Text(s) => JsonValue::String(s),
+                        SqlValue::Null => JsonValue::Null,
+                        _ => JsonValue::String("Unknown".to_string()),
+                    }
                 };
-                map.insert(col_names[i].clone(), json_val);
+                map.insert(name.clone(), json_val);
             }
             Ok(JsonValue::Object(map))
         })?;
@@ -427,25 +425,22 @@ impl SqliteManager {
         };
 
         let col_names: Vec<String> =
-            stmt.column_names().into_iter().map(|s| s.to_string()).collect();
+            stmt.column_names().into_iter().map(std::string::ToString::to_string).collect();
         let rows = stmt.query_map([], |row| {
             let mut map = Map::new();
-            for i in 0..col_names.len() {
+            // ISPRAVAK 2: Korištenje `enumerate()` umjesto `for i in 0..len()`
+            for (i, name) in col_names.iter().enumerate() {
                 let val: SqlValue = row.get(i)?;
                 let json_val = match val {
                     SqlValue::Null => JsonValue::Null,
                     SqlValue::Integer(i) => JsonValue::Number(i.into()),
                     SqlValue::Real(f) => {
-                        if let Some(n) = serde_json::Number::from_f64(f) {
-                            JsonValue::Number(n)
-                        } else {
-                            JsonValue::Null
-                        }
+                        serde_json::Number::from_f64(f).map_or(JsonValue::Null, JsonValue::Number)
                     }
                     SqlValue::Text(s) => JsonValue::String(s),
                     SqlValue::Blob(_) => JsonValue::String("<BINARY>".to_string()),
                 };
-                map.insert(col_names[i].clone(), json_val);
+                map.insert(name.clone(), json_val);
             }
             Ok(JsonValue::Object(map))
         })?;

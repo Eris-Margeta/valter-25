@@ -7,6 +7,13 @@ use tracing::warn;
 
 pub struct ContextEngine;
 
+// ISPRAVAK 1: Implementacija `Default` traita
+impl Default for ContextEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ContextEngine {
     pub fn new() -> Self {
         Self
@@ -64,17 +71,10 @@ impl ContextEngine {
     fn is_binary(&self, path: &Path) -> Result<bool> {
         let mut file = File::open(path)?;
         let mut buffer = [0; 1024];
-        // Read up to 1024 bytes
         let n = file.read(&mut buffer)?;
 
-        // Simple check: look for null bytes
-        for i in 0..n {
-            if buffer[i] == 0 {
-                return Ok(true);
-            }
-        }
-
-        Ok(false)
+        // ISPRAVAK 2: Korištenje iteratora umjesto `for i in 0..n`
+        Ok(buffer.iter().take(n).any(|&byte| byte == 0))
     }
 
     // Helper for future use (as per spec)

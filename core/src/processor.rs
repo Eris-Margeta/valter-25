@@ -26,7 +26,7 @@ impl EventProcessor {
         info!("🔍 Initial Scan: Starting...");
         for island_def in &self.config.islands {
             // Uklanjamo wildcard (*) da dobijemo base path
-            let base_path_str = island_def.root_path.replace("*", "");
+            let base_path_str = island_def.root_path.replace('*', "");
             let base_path = Path::new(&base_path_str);
 
             if !base_path.exists() {
@@ -67,9 +67,10 @@ impl EventProcessor {
                 let _ = self.process_metadata(&path, island_def);
             }
             // 2. Ako nije meta fajl, možda je sub-file (retrigger deep scan)
+            // ISPRAVAK: Korištenje `is_some_and` za čišći kod
             else if path
                 .extension()
-                .map_or(false, |ext| ext == "yaml" || ext == "md" || ext == "txt")
+                .is_some_and(|ext| ext == "yaml" || ext == "md" || ext == "txt")
             {
                 // Penjemo se gore dok ne nađemo meta fajl koji definira Island
                 let mut current = path.parent();
@@ -96,7 +97,7 @@ impl EventProcessor {
                 // Provjera putanje (Jako bitno da ne miješamo tipove ako imaju isto ime meta fajla)
                 // Jednostavna provjera: Da li putanja fajla počinje s root pathom islanda?
                 // Moramo maknuti glob charove.
-                let root_clean = island.root_path.replace("*", "").replace("./", "");
+                let root_clean = island.root_path.replace('*', "").replace("./", "");
                 // Oprez: Canonicalization bi bilo idealno, ali za sada string match:
                 let path_str = path.to_string_lossy();
 

@@ -1,3 +1,5 @@
+// core/src/lib.rs
+
 pub mod aggregator;
 pub mod api;
 pub mod cloud;
@@ -10,7 +12,7 @@ pub mod watcher;
 
 use anyhow::Result;
 use cloud::SqliteManager;
-use config::{env::EnvConfig, Config}; // <-- DODANO: Uvozimo EnvConfig
+use config::{env::EnvConfig, Config};
 use oracle::ToolGenerator;
 use processor::EventProcessor;
 use std::fs;
@@ -37,12 +39,8 @@ pub async fn run(valter_home: PathBuf, is_dev_mode: bool) -> Result<()> {
         valter_home, is_dev_mode
     );
 
-    // =================================================================== //
-    // KORAK 3: Inicijalizacija EnvConfig-a pri pokretanju
-    // =================================================================== //
     let env_config = Arc::new(EnvConfig::init());
     info!("Environment Config Status: {:?}", env_config.status);
-    // =================================================================== //
 
     loop {
         let config_path = if is_dev_mode {
@@ -71,7 +69,8 @@ pub async fn run(valter_home: PathBuf, is_dev_mode: bool) -> Result<()> {
             Ok(c) => Arc::new(c),
             Err(e) => {
                 error!("DB Error: {}", e);
-                return Err(e.into());
+                // ISPRAVAK: Uklonjen nepotreban `.into()`
+                return Err(e);
             }
         };
         if let Err(e) = cloud.init_schema(&config) {
@@ -88,19 +87,17 @@ pub async fn run(valter_home: PathBuf, is_dev_mode: bool) -> Result<()> {
         let cloud_clone = cloud.clone();
         let config_clone = config.clone();
         let processor_clone = processor.clone();
-        let env_config_clone = env_config.clone(); // <-- Kloniramo Arc za API
+        let env_config_clone = env_config.clone();
         let api_rx = shutdown_tx.subscribe();
         let api_handle = tokio::spawn(async move {
-            if let Err(e) =
-                // Ažuriramo poziv da proslijedimo env_config
-                api::start_server(
-                    cloud_clone,
-                    config_clone,
-                    processor_clone,
-                    env_config_clone,
-                    api_rx,
-                )
-                .await
+            if let Err(e) = api::start_server(
+                cloud_clone,
+                config_clone,
+                processor_clone,
+                env_config_clone,
+                api_rx,
+            )
+            .await
             {
                 error!("API Fatal: {}", e);
                 process::exit(1);
