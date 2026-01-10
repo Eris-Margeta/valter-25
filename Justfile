@@ -157,7 +157,7 @@ test-rust:
 # Testira frontend aplikaciju (lint & build)
 test-app:
     @echo "Lintam i buildam frontend aplikaciju (CI mod)..."
-    @if ./scripts/test-app.sh > app-test.log 2>&1; then \
+    @if ./tools/test-app.sh > app-test.log 2>&1; then \
         echo "✅ Frontend provjere su uspješno prošle."; \
     else \
         echo "\n❌ \033[1;31mPROVJERE ZA FRONTEND NISU USPJELE.\033[0m Provjerite 'app-test.log' za detalje."; \
@@ -181,7 +181,7 @@ test-rust-verbose:
 # Testira logiku konfiguracije s varijablama okruženja
 test-config:
     @echo "🧪 Testiram logiku varijabli okruženja..."
-    @./scripts/test-env-config.sh
+    @./tools/test-env-config.sh
 
 
 # =========================================================================
